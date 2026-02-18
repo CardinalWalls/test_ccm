@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { add, subtract, divide } from "../src/math";
+import { add, subtract, divide, multiply, power } from "../src/math";
 
 describe("math", () => {
   it("add", () => {
@@ -16,5 +16,13 @@ describe("math", () => {
 
   it("divide by zero throws", () => {
     expect(() => divide(1, 0)).toThrow("Division by zero");
+  });
+
+  it("multiply", () => {
+    expect(multiply(3, 4)).toBe(12);
+  });
+
+  it("power", () => {
+    expect(power(2, 10)).toBe(1024);
   });
 });
