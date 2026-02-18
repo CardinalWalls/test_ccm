@@ -1,5 +1,10 @@
 {
+  "scripts": {
+    "test": "vitest run"
+  },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "^2.1.45"
+    "@anthropic-ai/claude-code": "^2.1.45",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }
