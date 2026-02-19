@@ -19,34 +19,33 @@ Each Claude Code worker runs in an isolated git worktree bound to one task branc
 
 Do not symlink progress journals. `PROGRESS.md` and `LEARNINGS.md` stay in the repo root and are managed by the manager process.
 
-## Full Task Lifecycle (9 Steps, Mandatory)
+## Full Task Lifecycle (9 Steps — Worker Role)
 
-1. **Claim task**: atomic claim from `data/dev-tasks.json`.
-2. **Create worktree**:
-   - `git worktree add -b task/... ../...-worktrees/task-...`
-   - create isolated `data/`
-   - set up required symlinks
-   - allocate dedicated `PORT`
-3. **Implement**: complete requested behavior in the isolated worktree.
-4. **Commit on task branch**: use required commit format.
-5. **Merge + test gate**:
-   - `git fetch origin && git merge origin/main`
-   - run test command
-6. **Auto-merge prep to main**:
-   - `git fetch origin main`
-   - `git rebase origin/main`
-   - if rebase fails, resolve conflicts using protocol below
-   - if step 6 fails, return to step 5 and continue loop
-7. **Mark done**:
-   - update task status in `data/dev-tasks.json` before cleanup
-8. **Cleanup**:
-   - remove worktree
-   - delete local task branch
-   - delete remote task branch
-9. **Experience accumulation**:
-   - append lessons to `LEARNINGS.md` with commit reference
+The manager handles steps 1, 2, 4–9 automatically. **You (the worker) only handle step 3.**
 
-**Never give up**: Do not mark a task as failed during conflict resolution or while tests are failing. You must fully resolve all conflicts and ensure all tests pass before proceeding; tasks can only be marked complete after successful resolution. Problems must be fixed—never abandon a task due to mid-process challenges.
+1. **Claim task** — *manager*
+2. **Create worktree** — *manager*
+3. **Implement** — **YOUR JOB**: use Read/Write/Edit/Bash tools to implement the feature and make tests pass.
+4. **Commit on task branch** — *manager*
+5. **Merge + test gate** — *manager*
+6. **Rebase to main** — *manager*
+7. **Mark done** — *manager*
+8. **Cleanup** — *manager*
+9. **Experience accumulation** — *manager*
+
+**What you MUST do (step 3):**
+- Read source files to understand the codebase.
+- Write/Edit source and test files to implement the feature.
+- Run `npm test` and fix failures until all tests pass.
+- Commit your changes: `git add -A && git commit -m 'feat(<task-id>): <description>'`
+
+**What you must NOT do:**
+- Do NOT create or remove worktrees.
+- Do NOT merge, rebase, push, or create PRs.
+- Do NOT modify files under `data/` or `node_modules`.
+- Do NOT mark tasks as done/failed in `dev-tasks.json`.
+
+**Never give up**: If tests fail, keep fixing until they pass. Problems must be solved, not abandoned.
 
 ## Conflict Handling Protocol
 

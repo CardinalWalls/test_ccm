@@ -26,18 +26,25 @@ def build_worker_prompt(
     if lessons:
         lesson_block = "Relevant lessons from LEARNINGS.md:\n- " + "\n- ".join(lessons) + "\n"
     return (
-        "You are executing one coding task inside a managed worktree.\n"
-        "Project has CLAUDE.md. Follow it strictly.\n"
+        "You are executing one coding task inside a managed git worktree.\n"
+        "The manager handles git operations (worktree, merge, rebase, PR, cleanup).\n"
+        "Your ONLY job: implement the feature using tools, make tests pass, and commit.\n\n"
         f"Task ID: {task['id']}\n"
         f"Task title: {task.get('title', '')}\n"
         f"Task prompt: {task.get('prompt', '')}\n\n"
         f"{plan_block}"
         f"{lesson_block}"
-        "Requirements:\n"
-        "1) Implement requested behavior only.\n"
-        "2) Add/update tests.\n"
-        "3) Run npm test and keep fixing until green.\n"
-        "4) Commit changes once tests pass.\n"
+        "MANDATORY EXECUTION STEPS — do these NOW, in order:\n"
+        "1. Read existing source files to understand the codebase.\n"
+        "2. Write/Edit source files to implement the requested feature.\n"
+        "3. Write/Edit test files to add comprehensive tests.\n"
+        "4. Run `npm test` via Bash and fix failures until all tests pass.\n"
+        "5. Run `git add -A && git commit -m 'feat({task_id}): <description>'`.\n\n"
+        "CRITICAL RULES:\n"
+        "- You MUST use Read, Write, Edit, and Bash tools. Text-only responses are useless.\n"
+        "- Do NOT create worktrees, merge branches, push, or clean up — the manager does that.\n"
+        "- Do NOT modify files under data/ or node_modules.\n"
+        "- Commit message format: feat({task_id}): <short description>\n"
     )
 
 
