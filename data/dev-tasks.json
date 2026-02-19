@@ -1,1 +1,36 @@
-[]
+[
+  {
+    "id": "task-1",
+    "title": "Add modulo and abs",
+    "prompt": "Add modulo(a,b) and abs(x) functions to src/math.ts with full tests in tests/math.test.ts. Keep existing functions unchanged.",
+    "status": "done",
+    "created_at": "2026-02-19T08:13:11+00:00",
+    "plan_status": "approved",
+    "plan_reason": "Well-structured plan with thorough analysis of existing patterns, proper error handling for modulo division by zero, comprehensive test coverage, and clear acceptance criteria. Low conflict risk with additive-only changes.",
+    "planned_at": "2026-02-19T08:14:35+00:00",
+    "approved": true,
+    "claimed_at": "2026-02-19T08:15:00+00:00",
+    "completed_at": "2026-02-19T08:18:07+00:00",
+    "commit_id": "ee2c09248842dc63e741494dee90e68997d65daa",
+    "branch": "task/task-1-add-modulo-and-abs",
+    "pr_url": "https://github.com/CardinalWalls/test_ccm/pull/7",
+    "worker_id": 1
+  },
+  {
+    "id": "task-2",
+    "title": "Add sqrt and clamp",
+    "prompt": "Add sqrt(x) and clamp(x,min,max) functions to src/math.ts with tests in tests/math.test.ts. Keep existing functions unchanged.",
+    "status": "done",
+    "created_at": "2026-02-19T08:13:11+00:00",
+    "plan_status": "approved",
+    "plan_reason": "Plan is complete with clear steps, proper error handling for sqrt negative inputs, comprehensive test coverage, and follows existing codebase patterns. Low conflict risk as it only adds new functions without modifying existing ones.",
+    "planned_at": "2026-02-19T08:14:02+00:00",
+    "approved": true,
+    "claimed_at": "2026-02-19T08:15:00+00:00",
+    "completed_at": "2026-02-19T08:18:50+00:00",
+    "commit_id": "3b20afb24c57bc2c08d8b203e35e9a8d7aee2431",
+    "branch": "task/task-2-add-sqrt-and-clamp",
+    "pr_url": "https://github.com/CardinalWalls/test_ccm/pull/8",
+    "worker_id": 2
+  }
+]
