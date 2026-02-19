@@ -2,7 +2,3 @@ node_modules/
 *.log
 .env
 .claude/
-temp/
-*.egg-info/
-**/__pycache__/
-**/*.pyc

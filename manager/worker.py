@@ -2,19 +2,48 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from manager.config import (
+    BASE_WORKER_PORT,
     DEFAULT_BASE_BRANCH,
     DEFAULT_MAX_ITERATIONS,
     DEFAULT_MAX_WORKERS,
+    MAX_MERGE_RETRIES,
     ManagerPaths,
 )
 from manager.dispatcher import build_worker_prompt, dispatch_streaming_claude
 from manager.experience import append_learning, extract_relevant_lessons, load_events, summarize_events
-from manager.git_ops import cleanup_worktree, create_pr, create_worktree, push_branch
+from manager.git_ops import cleanup_worktree, create_pr, create_worktree, delete_remote_branch, push_branch
 from manager.runtime import locked_json_update, now_iso, run_cmd
+
+
+@dataclass
+class TaskTimeline:
+    task_id: str
+    step_timestamps: dict[str, str] = field(default_factory=dict)
+    counters: dict[str, int] = field(default_factory=dict)
+
+    def mark(self, step: str, ts: str | None = None) -> None:
+        self.step_timestamps[step] = ts or now_iso()
+
+    def bump(self, key: str) -> None:
+        self.counters[key] = int(self.counters.get(key, 0)) + 1
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "step_timestamps": self.step_timestamps,
+            "counters": self.counters,
+        }
+
+
+def _save_timeline(paths: ManagerPaths, timeline: TaskTimeline) -> None:
+    task_dir = paths.logs_dir / timeline.task_id
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "timeline.json").write_text(json.dumps(timeline.as_dict(), indent=2) + "\n", encoding="utf-8")
 
 
 def _read_plan_for_task(paths: ManagerPaths, task_id: str) -> dict[str, Any] | None:
@@ -62,6 +91,15 @@ def _run_tests(worktree: Path) -> bool:
     return cp.returncode == 0
 
 
+def _merge_and_test(worktree: Path, base_branch: str) -> bool:
+    run_cmd(["git", "fetch", "origin", base_branch], cwd=worktree, check=False)
+    cp = run_cmd(["git", "merge", f"origin/{base_branch}"], cwd=worktree, check=False)
+    if cp.returncode != 0:
+        run_cmd(["git", "merge", "--abort"], cwd=worktree, check=False)
+        return False
+    return _run_tests(worktree)
+
+
 def _commit_task(worktree: Path, task_id: str) -> bool:
     status = run_cmd(["git", "status", "--porcelain"], cwd=worktree, check=False)
     if not status.stdout.strip():
@@ -84,7 +122,13 @@ def _rebase_branch(worktree: Path, base_branch: str) -> tuple[bool, bool]:
     return False, has_conflict
 
 
-def _resolve_rebase_conflict(worktree: Path, task: dict[str, Any], paths: ManagerPaths) -> bool:
+def _resolve_rebase_conflict(
+    worktree: Path,
+    task: dict[str, Any],
+    paths: ManagerPaths,
+    *,
+    worker_port: int,
+) -> bool:
     prompt = (
         "Resolve active git rebase conflicts in this repository.\n"
         "Follow protocol: git status -> edit conflict files -> git add -> git rebase --continue.\n"
@@ -95,11 +139,34 @@ def _resolve_rebase_conflict(worktree: Path, task: dict[str, Any], paths: Manage
         task=task,
         prompt=prompt,
         logs_dir=paths.logs_dir,
+        worker_port=worker_port,
     )
     if rc != 0:
         return False
     rebase_state = (worktree / ".git" / "rebase-merge").exists() or (worktree / ".git" / "rebase-apply").exists()
     return not rebase_state and _run_tests(worktree)
+
+
+def _repair_merge_or_test_gate(
+    worktree: Path,
+    task: dict[str, Any],
+    paths: ManagerPaths,
+    *,
+    worker_port: int,
+) -> bool:
+    prompt = (
+        "You are at lifecycle step 5 (merge + test).\n"
+        "If merge is unfinished or conflicted, resolve it fully.\n"
+        "Then run npm test and fix failures until tests are green.\n"
+    )
+    rc, _ = dispatch_streaming_claude(
+        worktree=worktree,
+        task=task,
+        prompt=prompt,
+        logs_dir=paths.logs_dir,
+        worker_port=worker_port,
+    )
+    return rc == 0
 
 
 def _pr_body(plan: dict[str, Any] | None, lessons: list[str]) -> str:
@@ -117,6 +184,10 @@ def _pr_body(plan: dict[str, Any] | None, lessons: list[str]) -> str:
 
 def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) -> None:
     task_id = str(task["id"])
+    worker_port = BASE_WORKER_PORT + worker_id
+    timeline = TaskTimeline(task_id=task_id)
+    timeline.mark("step1_claimed", task.get("claimed_at") or now_iso())
+    _save_timeline(paths, timeline)
     plan = _read_plan_for_task(paths, task_id)
     lessons = extract_relevant_lessons(paths.learnings_path, task=task)
     branch = ""
@@ -132,30 +203,85 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             task_title=task.get("title", task_id),
             base_branch=DEFAULT_BASE_BRANCH,
         )
-        run_cmd(["npm", "ci"], cwd=worktree, timeout=1200, check=False)
+        timeline.mark("step2_worktree_created")
+        _save_timeline(paths, timeline)
+
+        # Worktree setup symlinks node_modules when available; otherwise bootstrap dependencies.
+        if not (paths.repo_root / "node_modules").exists():
+            run_cmd(["npm", "ci"], cwd=worktree, timeout=1200, check=False)
+
         success = False
+        timeline.mark("step3_implement_started")
+        _save_timeline(paths, timeline)
         while iterations < DEFAULT_MAX_ITERATIONS:
             iterations += 1
+            timeline.bump("step3_iterations")
             prompt = build_worker_prompt(task=task, plan=plan, lessons=lessons)
             rc, _summary = dispatch_streaming_claude(
                 worktree=worktree,
                 task=task,
                 prompt=prompt,
                 logs_dir=paths.logs_dir,
+                worker_port=worker_port,
             )
             if rc == 0 and _run_tests(worktree):
                 success = True
                 break
         if not success:
             raise RuntimeError("task did not pass tests within max iterations")
+        timeline.mark("step3_implement_done")
+        _save_timeline(paths, timeline)
 
         _commit_task(worktree, task_id=task_id)
-        rebased, conflict = _rebase_branch(worktree, base_branch=DEFAULT_BASE_BRANCH)
-        if not rebased and conflict:
-            had_conflict = True
-            if not _resolve_rebase_conflict(worktree, task=task, paths=paths):
-                raise RuntimeError("conflict resolution failed")
+        timeline.mark("step4_committed")
+        _save_timeline(paths, timeline)
+
+        merged_and_rebased = False
+        for _ in range(MAX_MERGE_RETRIES):
+            timeline.bump("step5_6_attempts")
+            if not _merge_and_test(worktree, base_branch=DEFAULT_BASE_BRANCH):
+                _repair_merge_or_test_gate(
+                    worktree=worktree,
+                    task=task,
+                    paths=paths,
+                    worker_port=worker_port,
+                )
+                continue
+            timeline.mark("step5_merge_test_passed")
+            _save_timeline(paths, timeline)
+
+            rebased, conflict = _rebase_branch(worktree, base_branch=DEFAULT_BASE_BRANCH)
+            if rebased:
+                timeline.mark("step6_rebase_passed")
+                _save_timeline(paths, timeline)
+                merged_and_rebased = True
+                break
+
+            if conflict:
+                had_conflict = True
+                timeline.bump("step6_conflicts")
+                if _resolve_rebase_conflict(
+                    worktree,
+                    task=task,
+                    paths=paths,
+                    worker_port=worker_port,
+                ):
+                    timeline.mark("step6_rebase_passed")
+                    _save_timeline(paths, timeline)
+                    merged_and_rebased = True
+                    break
+            _repair_merge_or_test_gate(
+                worktree=worktree,
+                task=task,
+                paths=paths,
+                worker_port=worker_port,
+            )
+        if not merged_and_rebased:
+            raise RuntimeError("merge/rebase failed after retry loop")
+
         push_branch(worktree=worktree, branch=branch)
+        timeline.mark("step6_pushed")
+        _save_timeline(paths, timeline)
         pr_url = create_pr(
             repo_root=paths.repo_root,
             title=f"feat({task_id}): {task.get('title', '').strip()}",
@@ -163,6 +289,8 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             head_branch=branch,
             base_branch=DEFAULT_BASE_BRANCH,
         )
+        timeline.mark("step6_pr_created")
+        _save_timeline(paths, timeline)
         commit_id = run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.strip()
         _update_task(
             paths,
@@ -176,6 +304,8 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
                 "worker_id": worker_id,
             },
         )
+        timeline.mark("step7_marked_done")
+        _save_timeline(paths, timeline)
     except Exception as exc:  # noqa: BLE001
         _update_task(
             paths,
@@ -188,6 +318,14 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             },
         )
     finally:
+        if branch and worktree:
+            # Best-effort step-8 remote cleanup; ignored when branch cannot be removed yet.
+            delete_remote_branch(paths.repo_root, branch)
+            cleanup_worktree(paths.repo_root, branch, worktree)
+            timeline.mark("step8_cleaned")
+            _save_timeline(paths, timeline)
+        timeline.mark("step9_learning_started")
+        _save_timeline(paths, timeline)
         events = load_events(paths.logs_dir / task_id / "events.jsonl")
         summary = summarize_events(task_id, events)
         summary["conflict"] = bool(summary.get("conflict")) or had_conflict
@@ -198,8 +336,8 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             title=task.get("title", ""),
             iterations=iterations or 1,
         )
-        if branch and worktree:
-            cleanup_worktree(paths.repo_root, branch, worktree)
+        timeline.mark("step9_learning_recorded")
+        _save_timeline(paths, timeline)
 
 
 def worker_loop(paths: ManagerPaths, worker_id: int) -> None:

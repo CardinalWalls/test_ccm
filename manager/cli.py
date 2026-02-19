@@ -65,6 +65,24 @@ def _table_for_plans(plans: list[dict[str, Any]]) -> Table:
     return table
 
 
+def _load_timeline_rows(paths: ManagerPaths) -> list[tuple[str, str, str]]:
+    rows: list[tuple[str, str, str]] = []
+    if not paths.logs_dir.exists():
+        return rows
+    for timeline_path in sorted(paths.logs_dir.glob("*/timeline.json")):
+        try:
+            payload = json.loads(timeline_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        task_id = str(payload.get("task_id") or timeline_path.parent.name)
+        steps = payload.get("step_timestamps", {})
+        if not isinstance(steps, dict):
+            continue
+        for step, ts in sorted(steps.items()):
+            rows.append((task_id, str(step), str(ts)))
+    return rows
+
+
 @click.group()
 def main() -> None:
     """Claude Code Manager CLI."""
@@ -185,6 +203,15 @@ def status_command(repo_path: str) -> None:
         )
     console.print(pr_table)
 
+    timeline_rows = _load_timeline_rows(paths)
+    timeline_table = Table(title="Task Lifecycle Timeline")
+    timeline_table.add_column("Task")
+    timeline_table.add_column("Step")
+    timeline_table.add_column("Timestamp")
+    for task_id, step, ts in timeline_rows:
+        timeline_table.add_row(task_id, step, ts)
+    console.print(timeline_table)
+
 
 @main.command("reflect")
 @click.option("--repo", "repo_path", default=".", help="Repository path")
@@ -195,6 +222,22 @@ def reflect_command(repo_path: str) -> None:
     rules = reflect_rules_with_claude(repo, paths.learnings_path)
     update_claude_md_rules(paths.claude_md_path, rules)
     console.print(f"Updated CLAUDE.md with {len(rules)} learned rule(s).")
+
+
+@main.command("timeline")
+@click.option("--repo", "repo_path", default=".", help="Repository path")
+def timeline_command(repo_path: str) -> None:
+    repo = _repo_from_arg(repo_path)
+    paths = build_paths(repo)
+    ensure_runtime_dirs(paths)
+    rows = _load_timeline_rows(paths)
+    table = Table(title="Task Lifecycle Timeline")
+    table.add_column("Task")
+    table.add_column("Step")
+    table.add_column("Timestamp")
+    for task_id, step, ts in rows:
+        table.add_row(task_id, step, ts)
+    console.print(table)
 
 
 if __name__ == "__main__":

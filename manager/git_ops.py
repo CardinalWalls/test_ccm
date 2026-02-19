@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,40 @@ def slugify(text: str) -> str:
 
 def branch_name_for_task(task_id: str, title: str) -> str:
     return f"task/{task_id}-{slugify(title)}"
+
+
+def _replace_path_with_symlink(target: Path, source: Path) -> None:
+    if target.is_symlink() or target.exists():
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        else:
+            target.unlink(missing_ok=True)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.symlink_to(source)
+
+
+def _prepare_worktree_layout(repo_root: Path, worktree: Path) -> None:
+    data_dir = worktree / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Shared queue/lock files for atomic task claiming across workers.
+    shared_data_sources = [
+        (repo_root / "data" / "dev-tasks.json", data_dir / "dev-tasks.json"),
+        (repo_root / "data" / "dev-tasks.lock", data_dir / "dev-tasks.lock"),
+    ]
+    for source, target in shared_data_sources:
+        if source.exists():
+            _replace_path_with_symlink(target, source)
+
+    # Optional shared credential file; support legacy/root and data/ locations.
+    api_key_candidates = [repo_root / "data" / "api-key.json", repo_root / "api-key.json"]
+    api_key_source = next((candidate for candidate in api_key_candidates if candidate.exists()), None)
+    if api_key_source:
+        _replace_path_with_symlink(data_dir / "api-key.json", api_key_source)
+
+    node_modules = repo_root / "node_modules"
+    if node_modules.exists():
+        _replace_path_with_symlink(worktree / "node_modules", node_modules)
 
 
 def create_worktree(
@@ -41,6 +76,7 @@ def create_worktree(
         cwd=repo_root,
         check=True,
     )
+    _prepare_worktree_layout(repo_root=repo_root, worktree=worktree)
     return branch, worktree
 
 
@@ -51,6 +87,10 @@ def cleanup_worktree(repo_root: Path, branch: str, worktree: Path) -> None:
 
 def push_branch(worktree: Path, branch: str) -> None:
     run_cmd(["git", "push", "-u", "origin", branch], cwd=worktree, timeout=300, check=True)
+
+
+def delete_remote_branch(repo_root: Path, branch: str) -> None:
+    run_cmd(["git", "push", "origin", "--delete", branch], cwd=repo_root, timeout=300, check=False)
 
 
 def create_pr(

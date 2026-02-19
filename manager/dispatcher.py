@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,7 @@ def dispatch_streaming_claude(
     *,
     prompt: str,
     logs_dir: Path,
+    worker_port: int | None = None,
     max_budget_usd: str = DEFAULT_MAX_BUDGET_USD,
     timeout: int = 1200,
 ) -> tuple[int, StreamSummary]:
@@ -62,6 +64,9 @@ def dispatch_streaming_claude(
         "--max-budget-usd",
         max_budget_usd,
     ]
+    env = os.environ.copy()
+    if worker_port is not None:
+        env["PORT"] = str(worker_port)
     proc = subprocess.Popen(
         command,
         cwd=str(worktree),
@@ -69,6 +74,7 @@ def dispatch_streaming_claude(
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=env,
     )
     summary = monitor_process(task_id=str(task["id"]), proc=proc, logs_root=logs_dir)
     return_code = proc.wait(timeout=timeout)
