@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" && npm test >/dev/null 2>&1 || { echo \"Tests must pass before stopping\"; exit 2; }'"
+          }
+        ]
+      }
+    ]
+  }
+}
+

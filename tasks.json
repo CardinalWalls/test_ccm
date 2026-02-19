@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "task": "Create README.md with project name",
+    "status": "done"
+  },
+  {
+    "id": 2,
+    "task": "Add .editorconfig file",
+    "status": "done"
+  }
+]

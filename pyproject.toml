@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ccm"
+version = "0.1.0"
+description = "Claude Code Manager CLI"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "click>=8.1.7",
+  "rich>=13.7.1",
+]
+
+[project.scripts]
+ccm = "manager.cli:main"
+
+[tool.setuptools]
+packages = ["manager"]
