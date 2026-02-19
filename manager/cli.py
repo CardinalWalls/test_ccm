@@ -11,7 +11,7 @@ from rich.table import Table
 
 from manager.config import DEFAULT_MAX_WORKERS, ManagerPaths, build_paths, ensure_runtime_dirs
 from manager.experience import reflect_rules_with_claude, update_claude_md_rules
-from manager.git_ops import list_prs
+from manager.git_ops import delete_remote_branch, list_prs
 from manager.plan_farm import plan_all
 from manager.runtime import now_iso
 from manager.worker import run_workers
@@ -238,6 +238,26 @@ def timeline_command(repo_path: str) -> None:
     for task_id, step, ts in rows:
         table.add_row(task_id, step, ts)
     console.print(table)
+
+
+@main.command("cleanup")
+@click.option("--repo", "repo_path", default=".", help="Repository path")
+def cleanup_command(repo_path: str) -> None:
+    repo = _repo_from_arg(repo_path)
+    paths = build_paths(repo)
+    ensure_runtime_dirs(paths)
+    tasks = _load_tasks(paths)
+
+    removed = 0
+    for task in tasks:
+        if task.get("status") != "done":
+            continue
+        branch = str(task.get("branch") or "").strip()
+        if not branch:
+            continue
+        delete_remote_branch(repo, branch)
+        removed += 1
+    console.print(f"Cleanup complete. Remote branches removed: {removed}")
 
 
 if __name__ == "__main__":

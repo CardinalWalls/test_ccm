@@ -9,6 +9,10 @@ from typing import Any, TextIO
 from manager.runtime import now_iso
 
 
+class DispatchError(RuntimeError):
+    """Raised when a Claude dispatch fails at the API level (no work done)."""
+
+
 @dataclass
 class StreamSummary:
     task_id: str
@@ -17,7 +21,29 @@ class StreamSummary:
     error_events: int = 0
     turns: int = 0
     estimated_cost_usd: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
     tool_counts: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def is_api_error(self) -> bool:
+        """True when the API never responded with usable output."""
+        return (
+            self.error_events > 0
+            and self.estimated_cost_usd == 0.0
+            and not self.tool_counts
+        )
+
+    @property
+    def is_healthy(self) -> bool:
+        """True when the dispatch produced meaningful work (tool use required)."""
+        if self.events == 0:
+            return False
+        if self.is_api_error:
+            return False
+        if not self.tool_counts:
+            return False
+        return True
 
 
 def _safe_float(value: Any) -> float:
@@ -71,6 +97,36 @@ def _extract_cost(event: dict[str, Any]) -> float:
     return 0.0
 
 
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _extract_tokens(event: dict[str, Any]) -> tuple[int, int]:
+    usage = event.get("usage")
+    if not isinstance(usage, dict):
+        return 0, 0
+
+    in_keys = ("input_tokens", "prompt_tokens", "inputTokens")
+    out_keys = ("output_tokens", "completion_tokens", "outputTokens")
+
+    input_tokens = 0
+    for key in in_keys:
+        if key in usage:
+            input_tokens = _safe_int(usage.get(key))
+            break
+
+    output_tokens = 0
+    for key in out_keys:
+        if key in usage:
+            output_tokens = _safe_int(usage.get(key))
+            break
+
+    return input_tokens, output_tokens
+
+
 def _write_jsonl_line(out: TextIO, record: dict[str, Any]) -> None:
     out.write(json.dumps(record, ensure_ascii=True) + "\n")
     out.flush()
@@ -110,6 +166,9 @@ def monitor_process(task_id: str, proc: Popen[str], logs_root: Path) -> StreamSu
                     summary.error_events += 1
                 summary.turns += _extract_turn_increment(event)
                 summary.estimated_cost_usd += _extract_cost(event)
+                input_tokens, output_tokens = _extract_tokens(event)
+                summary.input_tokens += input_tokens
+                summary.output_tokens += output_tokens
 
                 tool_name = _detect_tool_name(event)
                 if tool_name:

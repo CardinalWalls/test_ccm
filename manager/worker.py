@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,14 +10,16 @@ from typing import Any
 from manager.config import (
     BASE_WORKER_PORT,
     DEFAULT_BASE_BRANCH,
-    DEFAULT_MAX_ITERATIONS,
+    DEFAULT_MAX_TURNS_IMPLEMENT,
+    DEFAULT_MAX_TURNS_REPAIR,
     DEFAULT_MAX_WORKERS,
-    MAX_MERGE_RETRIES,
     ManagerPaths,
+    TASK_WALL_CLOCK_TIMEOUT,
 )
 from manager.dispatcher import build_worker_prompt, dispatch_streaming_claude
+from manager.stream_monitor import DispatchError, StreamSummary
 from manager.experience import append_learning, extract_relevant_lessons, load_events, summarize_events
-from manager.git_ops import cleanup_worktree, create_pr, create_worktree, delete_remote_branch, push_branch
+from manager.git_ops import cleanup_worktree, create_pr, create_worktree, push_branch
 from manager.runtime import locked_json_update, now_iso, run_cmd
 
 
@@ -25,6 +28,7 @@ class TaskTimeline:
     task_id: str
     step_timestamps: dict[str, str] = field(default_factory=dict)
     counters: dict[str, int] = field(default_factory=dict)
+    dispatches: list[dict[str, Any]] = field(default_factory=list)
 
     def mark(self, step: str, ts: str | None = None) -> None:
         self.step_timestamps[step] = ts or now_iso()
@@ -32,11 +36,29 @@ class TaskTimeline:
     def bump(self, key: str) -> None:
         self.counters[key] = int(self.counters.get(key, 0)) + 1
 
+    def record_dispatch(self, *, stage: str, summary: StreamSummary, return_code: int) -> None:
+        self.dispatches.append(
+            {
+                "ts": now_iso(),
+                "stage": stage,
+                "return_code": return_code,
+                "healthy": summary.is_healthy,
+                "events": summary.events,
+                "turns": summary.turns,
+                "error_events": summary.error_events,
+                "input_tokens": summary.input_tokens,
+                "output_tokens": summary.output_tokens,
+                "estimated_cost_usd": round(summary.estimated_cost_usd, 6),
+                "tool_counts": dict(summary.tool_counts),
+            }
+        )
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "step_timestamps": self.step_timestamps,
             "counters": self.counters,
+            "dispatches": self.dispatches,
         }
 
 
@@ -91,6 +113,14 @@ def _run_tests(worktree: Path) -> bool:
     return cp.returncode == 0
 
 
+def _check_deadline(task_id: str, started_at: float) -> None:
+    elapsed = time.monotonic() - started_at
+    if elapsed > TASK_WALL_CLOCK_TIMEOUT:
+        raise TimeoutError(
+            f"task {task_id}: exceeded wall-clock timeout ({TASK_WALL_CLOCK_TIMEOUT}s)"
+        )
+
+
 def _merge_and_test(worktree: Path, base_branch: str) -> bool:
     run_cmd(["git", "fetch", "origin", base_branch], cwd=worktree, check=False)
     cp = run_cmd(["git", "merge", f"origin/{base_branch}"], cwd=worktree, check=False)
@@ -128,13 +158,14 @@ def _resolve_rebase_conflict(
     paths: ManagerPaths,
     *,
     worker_port: int,
-) -> bool:
+) -> tuple[bool, int, StreamSummary]:
     prompt = (
         "Resolve active git rebase conflicts in this repository.\n"
         "Follow protocol: git status -> edit conflict files -> git add -> git rebase --continue.\n"
         "Then run npm test and fix failures.\n"
     )
-    rc, _ = dispatch_streaming_claude(
+    rc, summary = dispatch_streaming_claude(
+        max_turns=DEFAULT_MAX_TURNS_REPAIR,
         worktree=worktree,
         task=task,
         prompt=prompt,
@@ -142,9 +173,9 @@ def _resolve_rebase_conflict(
         worker_port=worker_port,
     )
     if rc != 0:
-        return False
+        return False, rc, summary
     rebase_state = (worktree / ".git" / "rebase-merge").exists() or (worktree / ".git" / "rebase-apply").exists()
-    return not rebase_state and _run_tests(worktree)
+    return (not rebase_state and _run_tests(worktree)), rc, summary
 
 
 def _repair_merge_or_test_gate(
@@ -153,20 +184,21 @@ def _repair_merge_or_test_gate(
     paths: ManagerPaths,
     *,
     worker_port: int,
-) -> bool:
+) -> tuple[bool, int, StreamSummary]:
     prompt = (
         "You are at lifecycle step 5 (merge + test).\n"
         "If merge is unfinished or conflicted, resolve it fully.\n"
         "Then run npm test and fix failures until tests are green.\n"
     )
-    rc, _ = dispatch_streaming_claude(
+    rc, summary = dispatch_streaming_claude(
+        max_turns=DEFAULT_MAX_TURNS_REPAIR,
         worktree=worktree,
         task=task,
         prompt=prompt,
         logs_dir=paths.logs_dir,
         worker_port=worker_port,
     )
-    return rc == 0
+    return rc == 0 and summary.is_healthy and _run_tests(worktree), rc, summary
 
 
 def _pr_body(plan: dict[str, Any] | None, lessons: list[str]) -> str:
@@ -195,6 +227,7 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
     iterations = 0
     commit_id: str | None = None
     had_conflict = False
+    started_at = time.monotonic()
     try:
         branch, worktree = create_worktree(
             repo_root=paths.repo_root,
@@ -210,42 +243,56 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
         if not (paths.repo_root / "node_modules").exists():
             run_cmd(["npm", "ci"], cwd=worktree, timeout=1200, check=False)
 
-        success = False
         timeline.mark("step3_implement_started")
         _save_timeline(paths, timeline)
-        while iterations < DEFAULT_MAX_ITERATIONS:
+        while True:
+            _check_deadline(task_id, started_at)
             iterations += 1
             timeline.bump("step3_iterations")
             prompt = build_worker_prompt(task=task, plan=plan, lessons=lessons)
             rc, _summary = dispatch_streaming_claude(
+                max_turns=DEFAULT_MAX_TURNS_IMPLEMENT,
                 worktree=worktree,
                 task=task,
                 prompt=prompt,
                 logs_dir=paths.logs_dir,
                 worker_port=worker_port,
             )
-            if rc == 0 and _run_tests(worktree):
-                success = True
+            timeline.record_dispatch(stage="step3_implement", summary=_summary, return_code=rc)
+            _save_timeline(paths, timeline)
+            if rc != 0 or not _summary.is_healthy:
+                continue
+            if not _run_tests(worktree):
+                continue
+            timeline.mark("step3_implement_done")
+            _save_timeline(paths, timeline)
+            if _commit_task(worktree, task_id=task_id):
+                timeline.mark("step4_committed")
+                _save_timeline(paths, timeline)
                 break
-        if not success:
-            raise RuntimeError("task did not pass tests within max iterations")
-        timeline.mark("step3_implement_done")
-        _save_timeline(paths, timeline)
+            timeline.bump("step4_empty_commits")
+            _save_timeline(paths, timeline)
 
-        _commit_task(worktree, task_id=task_id)
-        timeline.mark("step4_committed")
-        _save_timeline(paths, timeline)
-
-        merged_and_rebased = False
-        for _ in range(MAX_MERGE_RETRIES):
+        while True:
+            _check_deadline(task_id, started_at)
             timeline.bump("step5_6_attempts")
             if not _merge_and_test(worktree, base_branch=DEFAULT_BASE_BRANCH):
-                _repair_merge_or_test_gate(
+                repaired, repair_rc, repair_summary = _repair_merge_or_test_gate(
                     worktree=worktree,
                     task=task,
                     paths=paths,
                     worker_port=worker_port,
                 )
+                timeline.record_dispatch(
+                    stage="step5_repair_merge_or_test",
+                    summary=repair_summary,
+                    return_code=repair_rc,
+                )
+                _save_timeline(paths, timeline)
+                if not repaired:
+                    continue
+                timeline.mark("step5_merge_test_passed")
+                _save_timeline(paths, timeline)
                 continue
             timeline.mark("step5_merge_test_passed")
             _save_timeline(paths, timeline)
@@ -254,30 +301,41 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             if rebased:
                 timeline.mark("step6_rebase_passed")
                 _save_timeline(paths, timeline)
-                merged_and_rebased = True
                 break
 
             if conflict:
                 had_conflict = True
                 timeline.bump("step6_conflicts")
-                if _resolve_rebase_conflict(
+                resolved, resolve_rc, resolve_summary = _resolve_rebase_conflict(
                     worktree,
                     task=task,
                     paths=paths,
                     worker_port=worker_port,
-                ):
+                )
+                timeline.record_dispatch(
+                    stage="step6_resolve_rebase_conflict",
+                    summary=resolve_summary,
+                    return_code=resolve_rc,
+                )
+                _save_timeline(paths, timeline)
+                if resolved:
                     timeline.mark("step6_rebase_passed")
                     _save_timeline(paths, timeline)
-                    merged_and_rebased = True
                     break
-            _repair_merge_or_test_gate(
+            repaired, repair_rc, repair_summary = _repair_merge_or_test_gate(
                 worktree=worktree,
                 task=task,
                 paths=paths,
                 worker_port=worker_port,
             )
-        if not merged_and_rebased:
-            raise RuntimeError("merge/rebase failed after retry loop")
+            timeline.record_dispatch(
+                stage="step6_repair_after_failed_rebase",
+                summary=repair_summary,
+                return_code=repair_rc,
+            )
+            _save_timeline(paths, timeline)
+            if not repaired:
+                continue
 
         push_branch(worktree=worktree, branch=branch)
         timeline.mark("step6_pushed")
@@ -306,7 +364,7 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
         )
         timeline.mark("step7_marked_done")
         _save_timeline(paths, timeline)
-    except Exception as exc:  # noqa: BLE001
+    except (DispatchError, TimeoutError) as exc:
         _update_task(
             paths,
             task_id,
@@ -317,10 +375,19 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
                 "worker_id": worker_id,
             },
         )
+    except Exception as exc:  # noqa: BLE001
+        _update_task(
+            paths,
+            task_id,
+            "failed",
+            {
+                "failed_at": now_iso(),
+                "reason": f"unexpected-manager-error: {str(exc)[:470]}",
+                "worker_id": worker_id,
+            },
+        )
     finally:
         if branch and worktree:
-            # Best-effort step-8 remote cleanup; ignored when branch cannot be removed yet.
-            delete_remote_branch(paths.repo_root, branch)
             cleanup_worktree(paths.repo_root, branch, worktree)
             timeline.mark("step8_cleaned")
             _save_timeline(paths, timeline)

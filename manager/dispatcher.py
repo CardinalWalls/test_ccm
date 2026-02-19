@@ -6,8 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from manager.config import DEFAULT_MAX_BUDGET_USD
-from manager.stream_monitor import StreamSummary, monitor_process
+from manager.stream_monitor import DispatchError, StreamSummary, monitor_process
 
 
 def build_worker_prompt(
@@ -49,7 +48,7 @@ def dispatch_streaming_claude(
     prompt: str,
     logs_dir: Path,
     worker_port: int | None = None,
-    max_budget_usd: str = DEFAULT_MAX_BUDGET_USD,
+    max_turns: int,
     timeout: int = 1200,
 ) -> tuple[int, StreamSummary]:
     command = [
@@ -61,8 +60,8 @@ def dispatch_streaming_claude(
         "--output-format",
         "stream-json",
         "--verbose",
-        "--max-budget-usd",
-        max_budget_usd,
+        "--max-turns",
+        str(max_turns),
     ]
     env = os.environ.copy()
     if worker_port is not None:
@@ -78,5 +77,10 @@ def dispatch_streaming_claude(
     )
     summary = monitor_process(task_id=str(task["id"]), proc=proc, logs_root=logs_dir)
     return_code = proc.wait(timeout=timeout)
+    if summary.is_api_error:
+        raise DispatchError(
+            f"API-level failure for {summary.task_id}: "
+            f"{summary.error_events} errors, 0 cost, 0 tools"
+        )
     return return_code, summary
 
