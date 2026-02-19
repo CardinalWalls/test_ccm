@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { add, subtract, divide, multiply, power } from "../src/math";
+import { add, subtract, divide, multiply, power, modulo, abs } from "../src/math";
 
 describe("math", () => {
   it("add", () => {
@@ -24,5 +24,24 @@ describe("math", () => {
 
   it("power", () => {
     expect(power(2, 10)).toBe(1024);
+  });
+
+  it("modulo", () => {
+    expect(modulo(10, 3)).toBe(1);
+    expect(modulo(15, 4)).toBe(3);
+    expect(modulo(-10, 3)).toBe(-1);
+    expect(modulo(10, -3)).toBe(1);
+  });
+
+  it("modulo by zero throws", () => {
+    expect(() => modulo(1, 0)).toThrow("Division by zero");
+  });
+
+  it("abs", () => {
+    expect(abs(5)).toBe(5);
+    expect(abs(-5)).toBe(5);
+    expect(abs(0)).toBe(0);
+    expect(abs(3.14)).toBe(3.14);
+    expect(abs(-3.14)).toBe(3.14);
   });
 });

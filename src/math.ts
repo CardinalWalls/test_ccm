@@ -18,3 +18,12 @@ export function multiply(a: number, b: number): number {
 export function power(base: number, exponent: number): number {
   return Math.pow(base, exponent);
 }
+
+export function modulo(a: number, b: number): number {
+  if (b === 0) throw new Error("Division by zero");
+  return a % b;
+}
+
+export function abs(x: number): number {
+  return Math.abs(x);
+}
