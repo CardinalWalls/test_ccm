@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { add, subtract, divide, multiply, power } from "../src/math";
+import { add, subtract, divide, multiply, power, remainder } from "../src/math";
 
 describe("math", () => {
   it("add", () => {
@@ -18,11 +18,30 @@ describe("math", () => {
     expect(() => divide(1, 0)).toThrow("Division by zero");
   });
 
+  it("divide NaN result throws", () => {
+    expect(() => divide(Infinity, Infinity)).toThrow("Division result is NaN");
+  });
+
   it("multiply", () => {
     expect(multiply(3, 4)).toBe(12);
   });
 
   it("power", () => {
     expect(power(2, 10)).toBe(1024);
+  });
+
+  it("remainder", () => {
+    expect(remainder(7, 3)).toBe(1);
+    expect(remainder(10, 4)).toBe(2);
+  });
+
+  it("remainder with negative numbers", () => {
+    expect(remainder(-7, 3)).toBe(2);
+    expect(remainder(7, -3)).toBe(1);
+    expect(remainder(-7, -3)).toBe(2);
+  });
+
+  it("remainder by zero throws", () => {
+    expect(() => remainder(1, 0)).toThrow("Division by zero");
   });
 });
