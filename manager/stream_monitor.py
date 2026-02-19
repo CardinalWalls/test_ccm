@@ -53,18 +53,27 @@ def _safe_float(value: Any) -> float:
         return 0.0
 
 
-def _detect_tool_name(event: dict[str, Any]) -> str | None:
+def _detect_tool_names(event: dict[str, Any]) -> list[str]:
+    """Extract tool names from a stream-json event.
+
+    Claude stream-json --verbose nests tool use in message.content blocks:
+      {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read"}]}}
+    """
+    names: list[str] = []
     for key in ("tool_name", "toolName", "tool"):
         value = event.get(key)
         if isinstance(value, str) and value:
-            return value
-    payload = event.get("payload")
-    if isinstance(payload, dict):
-        for key in ("tool_name", "toolName", "tool"):
-            value = payload.get(key)
-            if isinstance(value, str) and value:
-                return value
-    return None
+            names.append(value)
+    msg = event.get("message")
+    if isinstance(msg, dict):
+        content = msg.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    name = block.get("name")
+                    if isinstance(name, str) and name:
+                        names.append(name)
+    return names
 
 
 def _is_error_event(event: dict[str, Any]) -> bool:
@@ -86,9 +95,10 @@ def _extract_turn_increment(event: dict[str, Any]) -> int:
 
 
 def _extract_cost(event: dict[str, Any]) -> float:
-    direct_cost = event.get("cost_usd")
-    if direct_cost is not None:
-        return _safe_float(direct_cost)
+    for key in ("cost_usd", "total_cost_usd"):
+        v = event.get(key)
+        if v is not None:
+            return _safe_float(v)
     usage = event.get("usage")
     if isinstance(usage, dict):
         for key in ("cost_usd", "usd", "cost"):
@@ -105,9 +115,19 @@ def _safe_int(value: Any) -> int:
 
 
 def _extract_tokens(event: dict[str, Any]) -> tuple[int, int]:
+    """Extract token counts.
+
+    stream-json --verbose puts usage in two places:
+      - result event: event.usage.input_tokens / output_tokens
+      - assistant event: event.message.usage.input_tokens / output_tokens
+    """
     usage = event.get("usage")
     if not isinstance(usage, dict):
-        return 0, 0
+        msg = event.get("message")
+        if isinstance(msg, dict):
+            usage = msg.get("usage")
+        if not isinstance(usage, dict):
+            return 0, 0
 
     in_keys = ("input_tokens", "prompt_tokens", "inputTokens")
     out_keys = ("output_tokens", "completion_tokens", "outputTokens")
@@ -170,8 +190,7 @@ def monitor_process(task_id: str, proc: Popen[str], logs_root: Path) -> StreamSu
                 summary.input_tokens += input_tokens
                 summary.output_tokens += output_tokens
 
-                tool_name = _detect_tool_name(event)
-                if tool_name:
+                for tool_name in _detect_tool_names(event):
                     summary.tool_counts[tool_name] = summary.tool_counts.get(tool_name, 0) + 1
 
                 _write_jsonl_line(

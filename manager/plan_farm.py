@@ -67,9 +67,9 @@ def generate_plan_for_task(task: dict[str, Any], repo_path: Path) -> dict[str, A
         "--output-format",
         "json",
         "--max-turns",
-        "3",
+        "15",
     ]
-    plan = _run_claude_json(command, cwd=repo_path, timeout=1200)
+    plan = _run_claude_json(command, cwd=repo_path, timeout=600)
     return {
         "task_id": task["id"],
         "task_title": task.get("title", ""),
@@ -137,8 +137,9 @@ def apply_review_results(
     plans: list[dict[str, Any]],
     review_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    so = review_result.get("structured_output") or review_result
     verdict_by_id: dict[str, dict[str, Any]] = {
-        item["task_id"]: item for item in review_result.get("verdicts", [])
+        item["task_id"]: item for item in so.get("verdicts", [])
     }
     updated: list[dict[str, Any]] = []
     for plan in plans:
