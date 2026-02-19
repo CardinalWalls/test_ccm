@@ -12,6 +12,7 @@ from rich.table import Table
 from manager.config import DEFAULT_MAX_WORKERS, ManagerPaths, build_paths, ensure_runtime_dirs
 from manager.experience import reflect_rules_with_claude, update_claude_md_rules
 from manager.git_ops import delete_remote_branch, list_prs
+from manager.worklog import generate_worklog
 from manager.plan_farm import plan_all
 from manager.runtime import now_iso
 from manager.worker import run_workers
@@ -238,6 +239,19 @@ def timeline_command(repo_path: str) -> None:
     for task_id, step, ts in rows:
         table.add_row(task_id, step, ts)
     console.print(table)
+
+
+@main.command("worklog")
+@click.option("--repo", "repo_path", default=".", help="Repository path")
+@click.option("--output", "output_path", default="docs/architecture-worklog.md", help="Output file path")
+def worklog_command(repo_path: str, output_path: str) -> None:
+    repo = _repo_from_arg(repo_path)
+    paths = build_paths(repo)
+    out_path = repo / output_path
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    md = generate_worklog(paths)
+    out_path.write_text(md, encoding="utf-8")
+    console.print(f"Wrote architecture work log to [bold]{out_path}[/bold]")
 
 
 @main.command("cleanup")

@@ -29,6 +29,8 @@ class TaskTimeline:
     step_timestamps: dict[str, str] = field(default_factory=dict)
     counters: dict[str, int] = field(default_factory=dict)
     dispatches: list[dict[str, Any]] = field(default_factory=list)
+    merge_attempts: list[dict[str, Any]] = field(default_factory=list)
+    rebase_attempts: list[dict[str, Any]] = field(default_factory=list)
 
     def mark(self, step: str, ts: str | None = None) -> None:
         self.step_timestamps[step] = ts or now_iso()
@@ -36,22 +38,58 @@ class TaskTimeline:
     def bump(self, key: str) -> None:
         self.counters[key] = int(self.counters.get(key, 0)) + 1
 
-    def record_dispatch(self, *, stage: str, summary: StreamSummary, return_code: int) -> None:
-        self.dispatches.append(
-            {
-                "ts": now_iso(),
-                "stage": stage,
-                "return_code": return_code,
-                "healthy": summary.is_healthy,
-                "events": summary.events,
-                "turns": summary.turns,
-                "error_events": summary.error_events,
-                "input_tokens": summary.input_tokens,
-                "output_tokens": summary.output_tokens,
-                "estimated_cost_usd": round(summary.estimated_cost_usd, 6),
-                "tool_counts": dict(summary.tool_counts),
-            }
-        )
+    def record_dispatch(
+        self,
+        *,
+        stage: str,
+        summary: StreamSummary,
+        return_code: int,
+        prompt_preview: str | None = None,
+        test_passed: bool | None = None,
+        test_output: str | None = None,
+        merge_output: str | None = None,
+        rebase_output: str | None = None,
+        rebase_conflict: bool | None = None,
+        commit_hash: str | None = None,
+        commit_files: list[str] | None = None,
+    ) -> None:
+        rec: dict[str, Any] = {
+            "ts": now_iso(),
+            "stage": stage,
+            "return_code": return_code,
+            "healthy": summary.is_healthy,
+            "events": summary.events,
+            "turns": summary.turns,
+            "error_events": summary.error_events,
+            "input_tokens": summary.input_tokens,
+            "output_tokens": summary.output_tokens,
+            "estimated_cost_usd": round(summary.estimated_cost_usd, 6),
+            "tool_counts": dict(summary.tool_counts),
+        }
+        if prompt_preview is not None:
+            rec["prompt_preview"] = prompt_preview[:200]
+        if test_passed is not None:
+            rec["test_passed"] = test_passed
+        if test_output is not None:
+            rec["test_output"] = test_output[:2000]
+        if merge_output is not None:
+            rec["merge_output"] = merge_output[:2000]
+        if rebase_output is not None:
+            rec["rebase_output"] = rebase_output[:2000]
+        if rebase_conflict is not None:
+            rec["rebase_conflict"] = rebase_conflict
+        if commit_hash is not None:
+            rec["commit_hash"] = commit_hash
+        if commit_files is not None:
+            rec["commit_files"] = commit_files
+        self.dispatches.append(rec)
+
+    def update_last_dispatch(self, **kwargs: Any) -> None:
+        if not self.dispatches:
+            return
+        for k, v in kwargs.items():
+            if v is not None:
+                self.dispatches[-1][k] = v
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +97,8 @@ class TaskTimeline:
             "step_timestamps": self.step_timestamps,
             "counters": self.counters,
             "dispatches": self.dispatches,
+            "merge_attempts": self.merge_attempts,
+            "rebase_attempts": self.rebase_attempts,
         }
 
 
@@ -108,9 +148,10 @@ def _update_task(paths: ManagerPaths, task_id: str, status: str, extra: dict[str
     locked_json_update(paths.tasks_path, paths.task_lock, updater)
 
 
-def _run_tests(worktree: Path) -> bool:
+def _run_tests(worktree: Path) -> tuple[bool, str]:
     cp = run_cmd(["npm", "test"], cwd=worktree, timeout=600, check=False)
-    return cp.returncode == 0
+    output = (cp.stdout or "") + (cp.stderr or "")
+    return cp.returncode == 0, output
 
 
 def _check_deadline(task_id: str, started_at: float) -> None:
@@ -121,17 +162,21 @@ def _check_deadline(task_id: str, started_at: float) -> None:
         )
 
 
-def _merge_and_test(worktree: Path, base_branch: str) -> bool:
+def _merge_and_test(worktree: Path, base_branch: str) -> tuple[bool, str]:
     _stash_artifacts(worktree)
     run_cmd(["git", "fetch", "origin", base_branch], cwd=worktree, check=False)
     cp = run_cmd(["git", "merge", f"origin/{base_branch}"], cwd=worktree, check=False)
+    merge_out = (cp.stdout or "") + (cp.stderr or "")
     if cp.returncode != 0:
         run_cmd(["git", "merge", "--abort"], cwd=worktree, check=False)
-        return False
-    return _run_tests(worktree)
+        return False, merge_out
+    passed, test_out = _run_tests(worktree)
+    return passed, f"merge_ok\n---test---\n{test_out}"
 
 
-def _commit_task(worktree: Path, task_id: str, base_branch: str = DEFAULT_BASE_BRANCH) -> bool:
+def _commit_task(
+    worktree: Path, task_id: str, base_branch: str = DEFAULT_BASE_BRANCH
+) -> tuple[bool, str | None, list[str]]:
     ARTIFACT_PREFIXES = ("data/", "node_modules")
 
     status = run_cmd(["git", "status", "--porcelain"], cwd=worktree, check=False)
@@ -147,7 +192,8 @@ def _commit_task(worktree: Path, task_id: str, base_branch: str = DEFAULT_BASE_B
             cwd=worktree,
             check=False,
         )
-        return True
+        hash_cp = run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree, check=False)
+        return True, hash_cp.stdout.strip() or None, source_changes
 
     new_commits = run_cmd(
         ["git", "log", f"origin/{base_branch}..HEAD", "--oneline"],
@@ -155,9 +201,13 @@ def _commit_task(worktree: Path, task_id: str, base_branch: str = DEFAULT_BASE_B
         check=False,
     )
     if new_commits.stdout.strip():
-        return True
+        first_line = new_commits.stdout.strip().splitlines()[0]
+        commit_hash = first_line.split()[0] if first_line else None
+        diff_cp = run_cmd(["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"], cwd=worktree, check=False)
+        files = [f for f in diff_cp.stdout.strip().splitlines() if f and not any(f.startswith(p) for p in ARTIFACT_PREFIXES)]
+        return True, commit_hash, files
 
-    return False
+    return False, None, []
 
 
 def _stash_artifacts(worktree: Path) -> None:
@@ -166,14 +216,15 @@ def _stash_artifacts(worktree: Path) -> None:
         run_cmd(["git", "checkout", "--", path], cwd=worktree, check=False)
 
 
-def _rebase_branch(worktree: Path, base_branch: str) -> tuple[bool, bool]:
+def _rebase_branch(worktree: Path, base_branch: str) -> tuple[bool, bool, str]:
     _stash_artifacts(worktree)
     run_cmd(["git", "fetch", "origin", base_branch], cwd=worktree, check=False)
     cp = run_cmd(["git", "rebase", f"origin/{base_branch}"], cwd=worktree, check=False)
+    out = (cp.stdout or "") + (cp.stderr or "")
     if cp.returncode == 0:
-        return True, False
-    has_conflict = "CONFLICT" in (cp.stdout + cp.stderr)
-    return False, has_conflict
+        return True, False, out
+    has_conflict = "CONFLICT" in out
+    return False, has_conflict, out
 
 
 def _resolve_rebase_conflict(
@@ -199,7 +250,8 @@ def _resolve_rebase_conflict(
     if rc != 0:
         return False, rc, summary
     rebase_state = (worktree / ".git" / "rebase-merge").exists() or (worktree / ".git" / "rebase-apply").exists()
-    return (not rebase_state and _run_tests(worktree)), rc, summary
+    test_passed, _ = _run_tests(worktree)
+    return (not rebase_state and test_passed), rc, summary
 
 
 def _repair_merge_or_test_gate(
@@ -222,7 +274,8 @@ def _repair_merge_or_test_gate(
         logs_dir=paths.logs_dir,
         worker_port=worker_port,
     )
-    return rc == 0 and summary.is_healthy and _run_tests(worktree), rc, summary
+    test_passed, _ = _run_tests(worktree)
+    return rc == 0 and summary.is_healthy and test_passed, rc, summary
 
 
 def _pr_body(plan: dict[str, Any] | None, lessons: list[str]) -> str:
@@ -282,15 +335,26 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
                 logs_dir=paths.logs_dir,
                 worker_port=worker_port,
             )
-            timeline.record_dispatch(stage="step3_implement", summary=_summary, return_code=rc)
+            timeline.record_dispatch(
+                stage="step3_implement",
+                summary=_summary,
+                return_code=rc,
+                prompt_preview=prompt[:200],
+            )
             _save_timeline(paths, timeline)
             if rc != 0 or not _summary.is_healthy:
                 continue
-            if not _run_tests(worktree):
+            test_passed, test_output = _run_tests(worktree)
+            timeline.update_last_dispatch(test_passed=test_passed, test_output=test_output)
+            _save_timeline(paths, timeline)
+            if not test_passed:
                 continue
             timeline.mark("step3_implement_done")
             _save_timeline(paths, timeline)
-            if _commit_task(worktree, task_id=task_id):
+            commit_ok, commit_hash, commit_files = _commit_task(worktree, task_id=task_id)
+            if commit_ok:
+                timeline.update_last_dispatch(commit_hash=commit_hash, commit_files=commit_files)
+                _save_timeline(paths, timeline)
                 timeline.mark("step4_committed")
                 _save_timeline(paths, timeline)
                 break
@@ -300,7 +364,10 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
         while True:
             _check_deadline(task_id, started_at)
             timeline.bump("step5_6_attempts")
-            if not _merge_and_test(worktree, base_branch=DEFAULT_BASE_BRANCH):
+            merge_ok, merge_output = _merge_and_test(worktree, base_branch=DEFAULT_BASE_BRANCH)
+            timeline.merge_attempts.append({"passed": merge_ok, "output": merge_output[:2000]})
+            _save_timeline(paths, timeline)
+            if not merge_ok:
                 repaired, repair_rc, repair_summary = _repair_merge_or_test_gate(
                     worktree=worktree,
                     task=task,
@@ -321,7 +388,9 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             timeline.mark("step5_merge_test_passed")
             _save_timeline(paths, timeline)
 
-            rebased, conflict = _rebase_branch(worktree, base_branch=DEFAULT_BASE_BRANCH)
+            rebased, conflict, rebase_output = _rebase_branch(worktree, base_branch=DEFAULT_BASE_BRANCH)
+            timeline.rebase_attempts.append({"passed": rebased, "conflict": conflict, "output": rebase_output[:2000]})
+            _save_timeline(paths, timeline)
             if rebased:
                 timeline.mark("step6_rebase_passed")
                 _save_timeline(paths, timeline)
@@ -340,6 +409,8 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
                     stage="step6_resolve_rebase_conflict",
                     summary=resolve_summary,
                     return_code=resolve_rc,
+                    rebase_output=rebase_output,
+                    rebase_conflict=conflict,
                 )
                 _save_timeline(paths, timeline)
                 if resolved:
@@ -356,6 +427,8 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
                 stage="step6_repair_after_failed_rebase",
                 summary=repair_summary,
                 return_code=repair_rc,
+                rebase_output=rebase_output,
+                rebase_conflict=conflict,
             )
             _save_timeline(paths, timeline)
             if not repaired:
@@ -420,12 +493,14 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
         events = load_events(paths.logs_dir / task_id / "events.jsonl")
         summary = summarize_events(task_id, events)
         summary["conflict"] = bool(summary.get("conflict")) or had_conflict
+        total_cost = sum(d.get("estimated_cost_usd", 0) for d in timeline.dispatches)
         append_learning(
             paths.learnings_path,
             summary,
             commit_id=commit_id,
             title=task.get("title", ""),
             iterations=iterations or 1,
+            cost_override=total_cost,
         )
         timeline.mark("step9_learning_recorded")
         _save_timeline(paths, timeline)

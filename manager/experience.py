@@ -24,6 +24,51 @@ def load_events(events_path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def _extract_cost_from_event(event: dict[str, Any]) -> float:
+    for key in ("total_cost_usd", "cost_usd"):
+        v = event.get(key)
+        if v is not None:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                pass
+    usage = event.get("usage")
+    if isinstance(usage, dict):
+        for key in ("cost_usd", "usd", "cost"):
+            if key in usage:
+                try:
+                    return float(usage[key])
+                except (TypeError, ValueError):
+                    pass
+    msg = event.get("message")
+    if isinstance(msg, dict):
+        usage = msg.get("usage")
+        if isinstance(usage, dict) and "cost_usd" in usage:
+            try:
+                return float(usage["cost_usd"])
+            except (TypeError, ValueError):
+                pass
+    return 0.0
+
+
+def _extract_tools_from_event(event: dict[str, Any]) -> list[str]:
+    tools: list[str] = []
+    for key in ("tool_name", "toolName", "tool"):
+        v = event.get(key)
+        if isinstance(v, str) and v:
+            tools.append(v)
+    msg = event.get("message")
+    if isinstance(msg, dict):
+        content = msg.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    name = block.get("name")
+                    if isinstance(name, str) and name:
+                        tools.append(name)
+    return tools
+
+
 def summarize_events(task_id: str, events: list[dict[str, Any]]) -> dict[str, Any]:
     tool_counts: dict[str, int] = {}
     turns = 0
@@ -43,19 +88,9 @@ def summarize_events(task_id: str, events: list[dict[str, Any]]) -> dict[str, An
             errors += 1
         if event_type in {"assistant_message", "assistant", "turn"}:
             turns += 1
-        usage = event.get("usage")
-        if isinstance(usage, dict):
-            for key in ("cost_usd", "usd", "cost"):
-                if key in usage:
-                    try:
-                        cost += float(usage[key])
-                    except Exception:  # noqa: BLE001
-                        pass
-                    break
-        for key in ("tool_name", "toolName", "tool"):
-            value = event.get(key)
-            if isinstance(value, str) and value:
-                tool_counts[value] = tool_counts.get(value, 0) + 1
+        cost += _extract_cost_from_event(event)
+        for tool in _extract_tools_from_event(event):
+            tool_counts[tool] = tool_counts.get(tool, 0) + 1
 
     top_issue = "clean run"
     if conflict:
@@ -81,6 +116,7 @@ def append_learning(
     commit_id: str | None,
     title: str | None = None,
     iterations: int | None = None,
+    cost_override: float | None = None,
 ) -> None:
     learnings_path.parent.mkdir(parents=True, exist_ok=True)
     heading = title or summary["task_id"]
@@ -89,10 +125,11 @@ def append_learning(
     )
     if not tool_str:
         tool_str = "none"
+    cost_val = cost_override if cost_override is not None else summary["cost"]
     lines = [
         f"## {summary['task_id']}: {heading} ({now_iso()[:10]})",
         f"- commit: {commit_id or 'n/a'}",
-        f"- cost: ${summary['cost']:.4f}, {iterations or 1} iteration(s), {summary['turns']} turns",
+        f"- cost: ${cost_val:.4f}, {iterations or 1} iteration(s), {summary['turns']} turns",
         f"- tools: {tool_str}",
         f"- conflict: {'yes' if summary['conflict'] else 'none'}",
         f"- lesson: {summary['lesson']}",
