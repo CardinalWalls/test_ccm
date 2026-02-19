@@ -501,6 +501,7 @@ def execute_one_task(task: dict[str, Any], paths: ManagerPaths, worker_id: int) 
             title=task.get("title", ""),
             iterations=iterations or 1,
             cost_override=total_cost,
+            dispatches=timeline.dispatches,
         )
         timeline.mark("step9_learning_recorded")
         _save_timeline(paths, timeline)

@@ -82,49 +82,6 @@ This is an external dependency failure, not a local script/hook/tmux integration
 
 ---
 
-## API Error Conditions: "Kiro 账户池暂无可用账户"
-
-The error `API Error: 500 ... "Kiro 账户池暂无可用账户"` means **Routin's backend account pool has no available accounts** for the requested model at that moment.
-
-### When it occurs
-
-- **Transient capacity**: Routin allocates API requests from a pooled backend. When the pool is exhausted (high load, many concurrent users), new requests get 500.
-- **Concurrent load**: Agent Teams spawns multiple Claude sessions; each makes API calls. This can exhaust the pool faster than single-session use.
-- **Model-specific**: Sonnet pool may be more constrained than Haiku. If Sonnet fails, Haiku might still work.
-
-### Mitigations
-
-1. **Retry later** when dashboard shows capacity/balance OK.
-2. **Use Haiku for the run**: set `ANTHROPIC_MODEL=claude-haiku-4-5-20251001` in `~/.claude/settings.json` env before running; Haiku often has more pool availability.
-3. **Pre-flight check**: run `npx claude -p "OK" </dev/null` with a 30s timeout; if it succeeds, API is healthy before starting the team run.
-4. **Avoid peak hours** if the pool is routinely exhausted during certain times.
-
-### Dashboard checks
-
-- Wallet/balance sufficient
-- No service alerts
-- If dashboard looks OK but CLI still fails, the pool can be temporarily depleted; wait a few minutes and retry.
-
-### Timeout / hang (no 500, no response)
-
-If `npx claude -p "OK"` times out (60–90s) with no output and no error:
-
-- **API reachable but slow**: Network latency or Routin backend load; requests may complete eventually.
-- **WSL2 / proxy**: Sometimes WSL2 has quirks reaching external APIs; try from native Linux or different network.
-- **First token delay**: The first response token can take 30–60s; increase pre-flight timeout or skip pre-flight and retry the team run when dashboard shows OK.
-
----
-
-## Re-run Attempt (Feb 18)
-
-- **Pre-flight**: `npx claude -p "Reply: OK"` timed out (45s) → warning shown, run proceeded.
-- **Team session**: Started in tmux; Claude received prompt but **never produced first response** (observed ~2 min).
-- **Direct API test**: `npx claude -p "Say exactly: OK"` timed out at 60s with no output, exit 124.
-
-**Condition**: Dashboard OK, but CLI calls hang/timeout. Possible causes: slow backend, WSL2 network latency, or pool returning delayed responses instead of 500. Next: retry when API responds quickly to a simple prompt, or try from native Linux / different network.
-
----
-
 ## Recommended Re-run Procedure
 
 When API capacity is restored:

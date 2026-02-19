@@ -1,64 +1,46 @@
 # CCM Demo Report
 
-## Run Summary
+## Run Summary (Full Feature Exercise)
 
-- **Date**: 2026-02-19 (final successful run)
-- **Base commit**: `e9d8144` on `main`
+- **Date**: 2026-02-19
+- **Base commit**: `44f0df8` on `main`
 - **Repository**: `CardinalWalls/test_ccm`
-- **Workers**: 2 (parallel)
-- **Tasks**: 2 (task-1: modulo/abs, task-2: sqrt/clamp)
+- **Round 1**: 2 workers (task-1 conflict-alpha, task-2 conflict-beta, task-3 forced-test-fail)
+- **Round 2**: 1 worker (task-4 learning-consumer, task-5 clean-baseline)
+- **Architecture Work Log**: `docs/architecture-worklog.md`
 
 ## Planning Results
 
 | Task | Plan Status | Approved | Review Reason |
 |---|---|---|---|
-| task-1 | approved | yes | Well-structured plan, proper error handling for modulo division by zero |
-| task-2 | approved | yes | Good error handling for sqrt negatives and clamp boundaries |
+| task-1 | approved | yes | conflict-alpha: modulo + divide change; conflicts with task-2 |
+| task-2 | approved | yes | conflict-beta: remainder + divide change |
+| task-3 | approved | yes | forced-test-fail: greet change; manually approved |
+| task-4 | approved | yes | learning-consumer: truncate, padLeft |
+| task-5 | approved | yes | clean-baseline: date-utils |
 
 ## Execution Results
 
-| Task | Status | Dispatches | Healthy | Tools Used | Cost | PR |
-|---|---|---|---|---|---|---|
-| task-1 | done | 2 | 1 of 2 | Read:2, Edit:3, Bash:1 | $0.089 | [#7](https://github.com/CardinalWalls/test_ccm/pull/7) |
-| task-2 | done | 3 | 1 of 3 | Read:2, Edit:3, Bash:1 | $0.044 | [#8](https://github.com/CardinalWalls/test_ccm/pull/8) |
+| Task | Status | Dispatches | Cost | PR |
+|---|---|---|---|---|
+| task-1 | failed | 35 | $0.32 | — |
+| task-2 | done | 2 | $0.12 | [#9](https://github.com/CardinalWalls/test_ccm/pull/9) |
+| task-3 | done | 1 | $0.03 | [#10](https://github.com/CardinalWalls/test_ccm/pull/10) |
+| task-4 | done | 13 | $0.06 | [#12](https://github.com/CardinalWalls/test_ccm/pull/12) |
+| task-5 | done | 4 | $0.08 | [#11](https://github.com/CardinalWalls/test_ccm/pull/11) |
 
-Both PRs contain **real code changes**: task-1 (+29/-1 lines, 2 files), task-2 (+34/-1 lines, 2 files).
+**Evidence trace**: Full per-dispatch flow, merge/rebase records, and learning loop details are in `docs/architecture-worklog.md`.
 
 ## Per-Task Lifecycle Timeline
 
-### Task 1 — Add modulo and abs (worker 1)
+Detailed step-level timelines with dispatches, test output, merge/rebase logs, and commit hashes are in **docs/architecture-worklog.md** (Section 6: Full Lifecycle Waterfall).
 
-| Step | Timestamp (UTC) | Duration | Notes |
-|---|---|---|---|
-| 1. Claim | 08:15:00 | — | Parallel with task-2 |
-| 2. Create worktree | 08:15:02 | 2s | Isolated worktree with symlinks |
-| 3. Implement | 08:15:02 → 08:17:55 | 2m53s | 2 dispatches: 1st unhealthy (text-only warmup), 2nd healthy (15 turns, Read+Edit+Bash) |
-| 4. Commit | 08:17:55 | <1s | Source files committed on task branch |
-| 5. Merge + test | 08:18:00 | 5s | Fetched origin/main, merged, npm test passed |
-| 6. Rebase + push | 08:18:02 → 08:18:04 | 2s | Clean rebase, pushed to remote |
-| 6b. PR created | 08:18:07 | 3s | [PR #7](https://github.com/CardinalWalls/test_ccm/pull/7) |
-| 7. Mark done | 08:18:07 | <1s | Status updated in dev-tasks.json |
-| 8. Cleanup | 08:18:07 | <1s | Worktree removed, branch deleted locally |
-| 9. Learning | 08:18:07 | <1s | Entry appended to LEARNINGS.md |
-
-**Total wall clock**: ~3 minutes (claim to done)
-
-### Task 2 — Add sqrt and clamp (worker 2)
-
-| Step | Timestamp (UTC) | Duration | Notes |
-|---|---|---|---|
-| 1. Claim | 08:15:00 | — | Parallel with task-1 |
-| 2. Create worktree | 08:15:02 | 2s | |
-| 3. Implement | 08:15:02 → 08:18:40 | 3m38s | 3 dispatches: 2 unhealthy warmups, 1 healthy (14 turns, Read+Edit+Bash) |
-| 4. Commit | 08:18:40 | <1s | |
-| 5. Merge + test | 08:18:43 | 3s | |
-| 6. Rebase + push | 08:18:44 → 08:18:47 | 3s | |
-| 6b. PR created | 08:18:50 | 3s | [PR #8](https://github.com/CardinalWalls/test_ccm/pull/8) |
-| 7. Mark done | 08:18:50 | <1s | |
-| 8. Cleanup | 08:18:50 | <1s | |
-| 9. Learning | 08:18:50 | <1s | |
-
-**Total wall clock**: ~4 minutes
+Summary:
+- **task-2** (conflict-beta): 2 workers parallel; first to merge; clean rebase.
+- **task-3** (forced-test-fail): test retry loop exercised; greet changed, tests updated, passed.
+- **task-1** (conflict-alpha): 29+ dispatches; Ralph loop on repeated test failures; manually failed.
+- **task-5** (clean-baseline): clean run; date-utils added.
+- **task-4** (learning-consumer): truncate/padLeft; LEARNINGS.md injected; completed.
 
 ## Bugs Found and Fixed (Run History)
 
@@ -92,28 +74,33 @@ Both PRs contain **real code changes**: task-1 (+29/-1 lines, 2 files), task-2 (
 
 | Capability | Covered | Evidence |
 |---|---|---|
-| 9-step lifecycle | **yes** | Both tasks completed all 9 steps with timestamps |
-| Worktree isolation | **yes** | Parallel worktrees, symlinked shared files |
-| Plan mode + review | **yes** | `ccm plan` generated structured plans, AI reviewer approved |
-| Implementation with real tools | **yes** | Read, Edit, Bash tool usage confirmed in events |
-| Manager commit (step 4) | **yes** | Source changes committed, artifacts excluded |
-| Merge + test gate (step 5) | **yes** | `npm test` passed after merge |
-| Rebase (step 6) | **yes** | Clean rebase to origin/main |
-| PR creation | **yes** | PRs #7, #8 with real diffs |
-| Learning extraction | **yes** | LEARNINGS.md entries with commit refs |
-| `ccm reflect` | **yes** | Ran, 0 new rules (clean run) |
-| `ccm status` | **yes** | Shows tasks + PRs + timeline |
-| `ccm cleanup` | available | Not exercised (PRs still open for review) |
-| Conflict resolution | not exercised | Both tasks touched different functions |
-| Test failure retry | not exercised | Claude's implementations passed tests |
-| LEARNINGS.md closed loop | partial | Entries recorded; no failures to learn from |
+| 9-step lifecycle | **yes** | tasks 2, 3, 4, 5 completed; timelines in architecture-worklog |
+| Worktree isolation | **yes** | Parallel worktrees (round 1), symlinked shared files |
+| Plan mode + review | **yes** | 5 plans generated, AI reviewer approved; plans/*.json |
+| Implementation with real tools | **yes** | Read, Edit, Bash, Write, Glob in events |
+| Manager commit (step 4) | **yes** | commit_hash, commit_files in timeline dispatches |
+| Merge + test gate (step 5) | **yes** | merge_attempts, test_output in timeline |
+| Rebase (step 6) | **yes** | rebase_attempts, rebase_conflict in timeline |
+| PR creation | **yes** | PRs #9, #10, #11, #12 |
+| Learning extraction | **yes** | LEARNINGS.md with cost, tools, lessons from all tasks |
+| `ccm worklog` | **yes** | docs/architecture-worklog.md from plans/logs/events/learnings |
+| `ccm reflect` | **yes** | Ran; CLAUDE.md rules |
+| `ccm status` | **yes** | Tasks + PRs + timeline per task |
+| Conflict resolution | **partial** | task-2 merged first; task-1 failed before rebase (different order) |
+| Test failure retry | **yes** | task-3 forced-test-fail; test retry loop exercised |
+| LEARNINGS.md closed loop | **yes** | task-4 (learning-consumer) prompt injected with lessons |
 
 ## Dispatch Pattern: "Warmup" Phenomenon
 
-Both tasks exhibited a consistent pattern: the first 1–2 dispatches produce text-only responses (no tool use, 1 turn, $0 cost). The manager correctly identifies these as unhealthy and re-dispatches. The next dispatch then uses tools and performs real work.
-
-This appears to be a Claude Code API behavior where the first invocation with a complex prompt returns a conversational response rather than entering agentic tool-use mode. The architecture handles this gracefully through the review loop.
+Early dispatches can produce text-only responses (no tool use, 1 turn, $0 cost). The manager identifies these as unhealthy and re-dispatches. The architecture handles this through the review loop.
 
 ## Final Assessment
 
-The CCM architecture is **validated end-to-end**. Two tasks ran in parallel through the complete 9-step lifecycle, producing real code changes with PRs. The iterative debugging process identified and fixed 11 bugs across the stream monitor, commit logic, git operations, plan review, and prompt engineering. The manager review loop correctly handles unhealthy dispatches, and the timeline provides full audit visibility.
+The Full Feature Exercise validated the architecture end-to-end:
+
+- **Manager logging**: Test output, git merge/rebase results, and commit hashes are recorded in timeline dispatches.
+- **Experience extraction**: Tool names and cost correctly extracted from stream-monitor events.
+- **`ccm worklog`**: Generates `docs/architecture-worklog.md` with plan review, dispatch flow, merge/rebase evidence, learning loop, and lifecycle waterfall.
+- **Conflict pair**: task-1/task-2 both modified `divide()`; task-2 merged first; task-1 failed on tests before rebase (Ralph loop exercised).
+- **Test retry**: task-3 (forced-test-fail) exercised the test-failure re-dispatch path.
+- **Learning loop**: task-4 (learning-consumer) received LEARNINGS.md injections; task-5 demonstrated clean baseline.

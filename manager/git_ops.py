@@ -21,6 +21,28 @@ def branch_name_for_task(task_id: str, title: str) -> str:
     return f"task/{task_id}-{slugify(title)}"
 
 
+def _exclude_layout_from_git(worktree: Path) -> None:
+    """Tell git to ignore worktree layout artifacts so they don't pollute commits."""
+    exclude_file = worktree / ".git" / "info" / "exclude"
+    if not exclude_file.exists():
+        git_info = worktree / ".git" / "info"
+        if not git_info.is_dir():
+            git_dir_file = worktree / ".git"
+            if git_dir_file.is_file():
+                real_git = Path(git_dir_file.read_text().split("gitdir: ")[1].strip())
+                exclude_file = real_git / "info" / "exclude"
+    exclude_file.parent.mkdir(parents=True, exist_ok=True)
+    entries = {"data/", "node_modules"}
+    existing = set()
+    if exclude_file.exists():
+        existing = set(exclude_file.read_text().splitlines())
+    missing = entries - existing
+    if missing:
+        with exclude_file.open("a", encoding="utf-8") as f:
+            for entry in sorted(missing):
+                f.write(f"{entry}\n")
+
+
 def _replace_path_with_symlink(target: Path, source: Path) -> None:
     if target.is_symlink() or target.exists():
         if target.is_dir() and not target.is_symlink():
@@ -35,7 +57,6 @@ def _prepare_worktree_layout(repo_root: Path, worktree: Path) -> None:
     data_dir = worktree / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    # Shared queue/lock files for atomic task claiming across workers.
     shared_data_sources = [
         (repo_root / "data" / "dev-tasks.json", data_dir / "dev-tasks.json"),
         (repo_root / "data" / "dev-tasks.lock", data_dir / "dev-tasks.lock"),
@@ -44,7 +65,6 @@ def _prepare_worktree_layout(repo_root: Path, worktree: Path) -> None:
         if source.exists():
             _replace_path_with_symlink(target, source)
 
-    # Optional shared credential file; support legacy/root and data/ locations.
     api_key_candidates = [repo_root / "data" / "api-key.json", repo_root / "api-key.json"]
     api_key_source = next((candidate for candidate in api_key_candidates if candidate.exists()), None)
     if api_key_source:
@@ -53,6 +73,8 @@ def _prepare_worktree_layout(repo_root: Path, worktree: Path) -> None:
     node_modules = repo_root / "node_modules"
     if node_modules.exists():
         _replace_path_with_symlink(worktree / "node_modules", node_modules)
+
+    _exclude_layout_from_git(worktree)
 
 
 def create_worktree(
@@ -64,7 +86,9 @@ def create_worktree(
     base_branch: str = DEFAULT_BASE_BRANCH,
 ) -> tuple[str, Path]:
     branch = branch_name_for_task(task_id, task_title)
-    worktree = worktree_root / f"task-{task_id}"
+    # task_id already has its own prefix (e.g. "task-1"), so use it directly.
+    # Avoid double-prefix like "task-task-1".
+    worktree = worktree_root / task_id
     worktree_root.mkdir(parents=True, exist_ok=True)
 
     if worktree.exists():

@@ -117,7 +117,15 @@ def append_learning(
     title: str | None = None,
     iterations: int | None = None,
     cost_override: float | None = None,
+    dispatches: list[dict[str, Any]] | None = None,
 ) -> None:
+    """Write a structured learning entry to LEARNINGS.md.
+
+    The ``dispatches`` argument (from timeline.json) enriches the lesson with
+    per-dispatch quality metrics: how many dispatches were unhealthy, how many
+    had failing tests, and whether any produced a conflict.  These metrics give
+    future workers concrete patterns to learn from rather than generic labels.
+    """
     learnings_path.parent.mkdir(parents=True, exist_ok=True)
     heading = title or summary["task_id"]
     tool_str = ", ".join(
@@ -126,13 +134,43 @@ def append_learning(
     if not tool_str:
         tool_str = "none"
     cost_val = cost_override if cost_override is not None else summary["cost"]
+
+    # Compute dispatch-level quality metrics from timeline dispatches.
+    dispatch_count = len(dispatches) if dispatches else (iterations or 1)
+    unhealthy_count = sum(1 for d in (dispatches or []) if not d.get("healthy", True))
+    test_fail_count = sum(
+        1 for d in (dispatches or []) if d.get("test_passed") is False
+    )
+    conflict = summary.get("conflict", False) or any(
+        d.get("rebase_conflict") for d in (dispatches or [])
+    )
+
+    # Build a descriptive lesson string that is actionable for future workers.
+    if unhealthy_count > 0 and test_fail_count > 0:
+        lesson = (
+            f"{unhealthy_count}/{dispatch_count} dispatches unhealthy (no tools); "
+            f"{test_fail_count} dispatch(es) had test failures"
+        )
+    elif unhealthy_count > 0:
+        lesson = f"{unhealthy_count}/{dispatch_count} dispatches unhealthy (no file-modifying tools used)"
+    elif test_fail_count > 0:
+        lesson = f"tests failed in {test_fail_count} dispatch(es) before final pass"
+    elif conflict:
+        lesson = "merge/rebase conflict encountered and resolved"
+    elif summary.get("errors", 0) > 0:
+        lesson = "runtime/tool errors detected"
+    else:
+        lesson = "clean run"
+
     lines = [
         f"## {summary['task_id']}: {heading} ({now_iso()[:10]})",
         f"- commit: {commit_id or 'n/a'}",
-        f"- cost: ${cost_val:.4f}, {iterations or 1} iteration(s), {summary['turns']} turns",
+        f"- cost: ${cost_val:.4f}, {dispatch_count} dispatch(es), {summary['turns']} turns",
         f"- tools: {tool_str}",
-        f"- conflict: {'yes' if summary['conflict'] else 'none'}",
-        f"- lesson: {summary['lesson']}",
+        f"- conflict: {'yes' if conflict else 'none'}",
+        f"- unhealthy_dispatches: {unhealthy_count}",
+        f"- test_fail_dispatches: {test_fail_count}",
+        f"- lesson: {lesson}",
         "",
     ]
     with learnings_path.open("a", encoding="utf-8") as file:
