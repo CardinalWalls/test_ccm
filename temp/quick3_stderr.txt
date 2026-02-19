@@ -1,0 +1,14 @@
+2026-02-18T13:14:01.681Z [DEBUG] [init] configureGlobalMTLS starting
+2026-02-18T13:14:01.682Z [DEBUG] [init] configureGlobalMTLS complete
+2026-02-18T13:14:01.682Z [DEBUG] [init] configureGlobalAgents starting
+2026-02-18T13:14:01.685Z [DEBUG] [init] configureGlobalAgents complete
+2026-02-18T13:14:01.705Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-02-18T13:14:01.754Z [DEBUG] Found 0 plugins (0 enabled, 0 disabled)
+2026-02-18T13:14:01.755Z [DEBUG] [claudeai-mcp] Checking gate (cached)...
+2026-02-18T13:14:01.755Z [DEBUG] [claudeai-mcp] Gate returned: true
+2026-02-18T13:14:01.755Z [DEBUG] [claudeai-mcp] No access token
+2026-02-18T13:14:01.787Z [DEBUG] Git remote URL: null
+2026-02-18T13:14:01.787Z [DEBUG] No git remote URL found
+2026-02-18T13:14:43.371Z [DEBUG] Getting matching hook commands for SessionEnd with query: other
+2026-02-18T13:14:43.371Z [DEBUG] Found 0 hook matchers in settings
+2026-02-18T13:14:43.371Z [DEBUG] Matched 0 unique hooks for query "other" (0 before deduplication)

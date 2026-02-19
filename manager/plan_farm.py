@@ -67,9 +67,9 @@ def generate_plan_for_task(task: dict[str, Any], repo_path: Path) -> dict[str, A
         "--output-format",
         "json",
         "--max-turns",
-        "6",
+        "3",
     ]
-    plan = _run_claude_json(command, cwd=repo_path, timeout=600)
+    plan = _run_claude_json(command, cwd=repo_path, timeout=1200)
     return {
         "task_id": task["id"],
         "task_title": task.get("title", ""),

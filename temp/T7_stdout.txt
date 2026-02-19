@@ -1,0 +1,5 @@
+Just one dev dependency:
+
+- `@anthropic-ai/claude-code`: `^2.1.45`
+
+No runtime dependencies.

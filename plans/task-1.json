@@ -1,0 +1,32 @@
+{
+  "task_id": "task-1",
+  "task_title": "conflict-alpha",
+  "generated_at": "2026-02-19T04:28:59.897633+00:00",
+  "status": "approved",
+  "approved": true,
+  "review_reason": "Clear scope: adds modulo + clamp to math.ts with tests",
+  "plan": {
+    "title": "Add modulo and clamp to math.ts",
+    "steps": [
+      "Add modulo(a, b) function using % operator with zero-divisor guard",
+      "Add clamp(value, min, max) function with boundary logic",
+      "Add test cases for both functions in tests/math.test.ts",
+      "Run npm test to verify"
+    ],
+    "acceptance": [
+      "modulo(10, 3) returns 1",
+      "modulo(5, 0) throws Error",
+      "clamp(5, 1, 10) returns 5",
+      "clamp(-1, 0, 10) returns 0",
+      "clamp(15, 0, 10) returns 10"
+    ],
+    "risks": [
+      "Overlaps with task-2 on same file"
+    ],
+    "files_to_modify": [
+      "src/math.ts",
+      "tests/math.test.ts"
+    ],
+    "estimate": "5 minutes"
+  }
+}

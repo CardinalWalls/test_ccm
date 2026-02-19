@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: ccm
+Version: 0.1.0
+Summary: Claude Code Manager CLI
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.1.7
+Requires-Dist: rich>=13.7.1
+
+# claude-learning
+# test_ccm

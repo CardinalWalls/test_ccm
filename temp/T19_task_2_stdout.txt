@@ -1,0 +1,1 @@
+Done. The `.editorconfig` sets 2-space indentation for TS/JS/JSON, LF line endings, UTF-8, and final newlines across the board — matching the existing code style.

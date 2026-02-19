@@ -1,0 +1,41 @@
+[
+  {
+    "task": "add logging",
+    "ok": true,
+    "returncode": 0,
+    "num_turns": 14,
+    "result_preview": "The structured output has been returned. The plan is complete \u2014 I've identified the three steps needed to add logging to this TypeScript project based on the schema from `t18_plan_",
+    "attempts": [
+      {
+        "attempt": 1,
+        "returncode": 0
+      }
+    ]
+  },
+  {
+    "task": "add error handling",
+    "ok": true,
+    "returncode": 0,
+    "num_turns": 9,
+    "result_preview": "The user asked for a JSON object matching a schema, but no schema was specified. I've provided a structured output using the available `StructuredOutput` tool which matches the def",
+    "attempts": [
+      {
+        "attempt": 1,
+        "returncode": 0
+      }
+    ]
+  },
+  {
+    "task": "add input validation",
+    "ok": true,
+    "returncode": 0,
+    "num_turns": 8,
+    "result_preview": "The plan is ready. Both `src/greet.ts` and `src/farewell.ts` have simple string-returning functions that currently accept any input without validation. The plan adds guards for nul",
+    "attempts": [
+      {
+        "attempt": 1,
+        "returncode": 0
+      }
+    ]
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "task_id": "task-5",
+  "task_title": "clean-baseline",
+  "generated_at": "2026-02-19T04:28:59.897633+00:00",
+  "status": "approved",
+  "approved": true,
+  "review_reason": "Independent, low-risk utility addition",
+  "plan": {
+    "title": "Add date-utils module with tests",
+    "steps": [
+      "Create src/date-utils.ts with formatDate and daysBetween",
+      "Create tests/date-utils.test.ts with test cases",
+      "Run npm test to verify"
+    ],
+    "acceptance": [
+      "formatDate returns YYYY-MM-DD string",
+      "daysBetween calculates correct difference",
+      "All existing tests still pass"
+    ],
+    "risks": [],
+    "files_to_modify": [
+      "src/date-utils.ts",
+      "tests/date-utils.test.ts"
+    ],
+    "estimate": "3 minutes"
+  }
+}

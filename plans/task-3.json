@@ -1,0 +1,30 @@
+{
+  "task_id": "task-3",
+  "task_title": "forced-test-failure",
+  "generated_at": "2026-02-19T04:28:59.897633+00:00",
+  "status": "approved",
+  "approved": true,
+  "review_reason": "Tests existing greet behavior change; worker must update tests",
+  "plan": {
+    "title": "Update greet + add farewell with tests",
+    "steps": [
+      "Change greet() return from 'Hello, <name>!' to 'Hi, <name>! Welcome!'",
+      "Add farewell(name) returning 'Goodbye, <name>!'",
+      "Create tests/greet.test.ts with comprehensive tests",
+      "Fix any existing tests that relied on old greeting format"
+    ],
+    "acceptance": [
+      "greet('World') returns 'Hi, World! Welcome!'",
+      "farewell('World') returns 'Goodbye, World!'",
+      "All tests pass including new greet.test.ts"
+    ],
+    "risks": [
+      "Existing code may reference old greeting format"
+    ],
+    "files_to_modify": [
+      "src/greet.ts",
+      "tests/greet.test.ts"
+    ],
+    "estimate": "5 minutes"
+  }
+}
