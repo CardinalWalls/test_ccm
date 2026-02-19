@@ -37,7 +37,7 @@ The manager handles steps 1, 2, 4–9 automatically. **You (the worker) only han
 - Read source files to understand the codebase.
 - Write/Edit source and test files to implement the feature.
 - Run `npm test` and fix failures until all tests pass.
-- Commit your changes: `git add -A && git commit -m 'feat(<task-id>): <description>'`
+- Leave your changes uncommitted — the manager handles git commit.
 
 **What you must NOT do:**
 - Do NOT create or remove worktrees.

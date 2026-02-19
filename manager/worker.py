@@ -130,22 +130,33 @@ def _merge_and_test(worktree: Path, base_branch: str) -> bool:
     return _run_tests(worktree)
 
 
-def _commit_task(worktree: Path, task_id: str) -> bool:
+def _commit_task(worktree: Path, task_id: str, base_branch: str = DEFAULT_BASE_BRANCH) -> bool:
     ARTIFACT_PREFIXES = ("data/", "node_modules")
+
     status = run_cmd(["git", "status", "--porcelain"], cwd=worktree, check=False)
     changed_files = [line[3:] for line in status.stdout.strip().splitlines() if line.strip()]
     source_changes = [f for f in changed_files if not any(f.startswith(p) for p in ARTIFACT_PREFIXES)]
-    if not source_changes:
-        return False
-    run_cmd(["git", "add", "-A"], cwd=worktree)
-    for prefix in ARTIFACT_PREFIXES:
-        run_cmd(["git", "reset", "HEAD", "--", prefix], cwd=worktree, check=False)
-    run_cmd(
-        ["git", "commit", "-m", f"feat({task_id}): implement approved plan"],
+
+    if source_changes:
+        run_cmd(["git", "add", "-A"], cwd=worktree)
+        for prefix in ARTIFACT_PREFIXES:
+            run_cmd(["git", "reset", "HEAD", "--", prefix], cwd=worktree, check=False)
+        run_cmd(
+            ["git", "commit", "-m", f"feat({task_id}): implement approved plan"],
+            cwd=worktree,
+            check=False,
+        )
+        return True
+
+    new_commits = run_cmd(
+        ["git", "log", f"origin/{base_branch}..HEAD", "--oneline"],
         cwd=worktree,
         check=False,
     )
-    return True
+    if new_commits.stdout.strip():
+        return True
+
+    return False
 
 
 def _rebase_branch(worktree: Path, base_branch: str) -> tuple[bool, bool]:

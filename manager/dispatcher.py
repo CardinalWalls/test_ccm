@@ -38,13 +38,12 @@ def build_worker_prompt(
         "1. Read existing source files to understand the codebase.\n"
         "2. Write/Edit source files to implement the requested feature.\n"
         "3. Write/Edit test files to add comprehensive tests.\n"
-        "4. Run `npm test` via Bash and fix failures until all tests pass.\n"
-        "5. Run `git add -A && git commit -m 'feat({task_id}): <description>'`.\n\n"
+        "4. Run `npm test` via Bash and fix failures until all tests pass.\n\n"
         "CRITICAL RULES:\n"
         "- You MUST use Read, Write, Edit, and Bash tools. Text-only responses are useless.\n"
+        "- Do NOT run git commit — the manager commits for you.\n"
         "- Do NOT create worktrees, merge branches, push, or clean up — the manager does that.\n"
         "- Do NOT modify files under data/ or node_modules.\n"
-        "- Commit message format: feat({task_id}): <short description>\n"
     )
 
 
