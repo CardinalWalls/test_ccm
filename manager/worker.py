@@ -122,6 +122,7 @@ def _check_deadline(task_id: str, started_at: float) -> None:
 
 
 def _merge_and_test(worktree: Path, base_branch: str) -> bool:
+    _stash_artifacts(worktree)
     run_cmd(["git", "fetch", "origin", base_branch], cwd=worktree, check=False)
     cp = run_cmd(["git", "merge", f"origin/{base_branch}"], cwd=worktree, check=False)
     if cp.returncode != 0:
@@ -159,7 +160,14 @@ def _commit_task(worktree: Path, task_id: str, base_branch: str = DEFAULT_BASE_B
     return False
 
 
+def _stash_artifacts(worktree: Path) -> None:
+    """Checkout artifact paths so symlink typechanges don't block rebase/merge."""
+    for path in ("data", "node_modules"):
+        run_cmd(["git", "checkout", "--", path], cwd=worktree, check=False)
+
+
 def _rebase_branch(worktree: Path, base_branch: str) -> tuple[bool, bool]:
+    _stash_artifacts(worktree)
     run_cmd(["git", "fetch", "origin", base_branch], cwd=worktree, check=False)
     cp = run_cmd(["git", "rebase", f"origin/{base_branch}"], cwd=worktree, check=False)
     if cp.returncode == 0:

@@ -34,16 +34,19 @@ class StreamSummary:
             and not self.tool_counts
         )
 
+    PLANNING_ONLY_TOOLS = {"TodoWrite", "TodoRead"}
+
     @property
     def is_healthy(self) -> bool:
-        """True when the dispatch produced meaningful work (tool use required)."""
+        """True when the dispatch produced meaningful work (file-modifying tool use required)."""
         if self.events == 0:
             return False
         if self.is_api_error:
             return False
         if not self.tool_counts:
             return False
-        return True
+        real_tools = {k for k in self.tool_counts if k not in self.PLANNING_ONLY_TOOLS}
+        return bool(real_tools)
 
 
 def _safe_float(value: Any) -> float:
