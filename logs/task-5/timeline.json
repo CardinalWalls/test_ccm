@@ -1,0 +1,64 @@
+{
+  "task_id": "task-5",
+  "step_timestamps": {
+    "step1_claimed": "2026-02-20T02:35:59+00:00",
+    "step2_worktree_created": "2026-02-20T02:36:01+00:00",
+    "step3_implement_started": "2026-02-20T02:36:01+00:00",
+    "step3_implement_done": "2026-02-20T02:38:35+00:00",
+    "step4_committed": "2026-02-20T02:38:35+00:00",
+    "step5_merge_test_passed": "2026-02-20T02:38:37+00:00",
+    "step6_rebase_passed": "2026-02-20T02:38:38+00:00",
+    "step6_pushed": "2026-02-20T02:38:40+00:00",
+    "step6_pr_created": "2026-02-20T02:38:43+00:00",
+    "step7_marked_done": "2026-02-20T02:38:43+00:00",
+    "step8_cleaned": "2026-02-20T02:38:43+00:00",
+    "step9_learning_started": "2026-02-20T02:38:43+00:00",
+    "step9_learning_recorded": "2026-02-20T02:38:43+00:00"
+  },
+  "counters": {
+    "step3_iterations": 1,
+    "step5_6_attempts": 1
+  },
+  "dispatches": [
+    {
+      "ts": "2026-02-20T02:38:34+00:00",
+      "stage": "step3_implement",
+      "return_code": 0,
+      "healthy": true,
+      "events": 35,
+      "turns": 18,
+      "error_events": 0,
+      "input_tokens": 99947,
+      "output_tokens": 260,
+      "estimated_cost_usd": 0.066822,
+      "tool_counts": {
+        "TodoWrite": 5,
+        "Read": 4,
+        "Bash": 4,
+        "Write": 2
+      },
+      "prompt_preview": "You are executing one coding task inside a managed git worktree.\nThe manager handles git operations (worktree, merge, rebase, PR, cleanup).\nYour ONLY job: implement the feature using tools, make tests",
+      "test_passed": true,
+      "test_output": "\n> test\n> vitest run\n\n\n RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-5\n\n \u2713 tests/date-utils.test.ts (10 tests) 6ms\n \u2713 tests/greet.test.ts (1 test) 2ms\n \u2713 tests/string-utils.test.ts (8 tests) 3ms\n \u2713 tests/math.test.ts (6 tests) 4ms\n \u2713 tests/array-utils.test.ts (10 tests) 5ms\n\n Test Files  5 passed (5)\n      Tests  35 passed (35)\n   Start at  10:38:34\n   Duration  392ms (transform 195ms, setup 0ms, collect 268ms, tests 20ms, environment 1ms, prepare 605ms)\n\n",
+      "commit_hash": "cb69d3ee99e2593494a3690e53e9ffe30b2a8c5e",
+      "commit_files": [
+        "ata/dev-tasks.json",
+        "src/date-utils.ts",
+        "tests/date-utils.test.ts"
+      ]
+    }
+  ],
+  "merge_attempts": [
+    {
+      "passed": true,
+      "output": "merge_ok\n---test---\n\n> test\n> vitest run\n\n\n RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-5\n\n \u2713 tests/date-utils.test.ts (10 tests) 5ms\n \u2713 tests/greet.test.ts (1 test) 2ms\n \u2713 tests/math.test.ts (6 tests) 4ms\n \u2713 tests/array-utils.test.ts (10 tests) 4ms\n \u2713 tests/string-utils.test.ts (8 tests) 3ms\n\n Test Files  5 passed (5)\n      Tests  35 passed (35)\n   Start at  10:38:37\n   Duration  380ms (transform 144ms, setup 0ms, collect 233ms, tests 17ms, environment 1ms, prepare 493ms)\n\n"
+    }
+  ],
+  "rebase_attempts": [
+    {
+      "passed": true,
+      "conflict": false,
+      "output": "Current branch task/task-5-clean-baseline is up to date.\n"
+    }
+  ]
+}

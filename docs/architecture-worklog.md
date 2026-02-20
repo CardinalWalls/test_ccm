@@ -6,489 +6,113 @@ This document traces the CCM architecture's decision-making with cited evidence.
 
 ### task-1
 - **Status**: approved | **Approved**: True
-- **Review reason**: Comprehensive plan with detailed steps and clear acceptance criteria. However, conflicts with task-2 as both modify the same divide function in src/math.ts. Should be executed after task-2 to avoid merge conflicts.
+- **Review reason**: HIGH CONFLICT RISK with task-2. Both tasks modify the same files (src/math.ts, tests/math.test.ts) and both add modulo-related functionality. Task-1 adds 'modulo' function while task-2 adds 'remainder' function - these will conflict. Tasks need coordination or one should be deferred.
 - **Steps**:
-  - Add modulo(a, b) function to src/math.ts with division-by-zero guard that throws error if b === 0
-  - Modify existing divide function in src/math.ts to add Number.isFinite() check on result and throw error if not finite
-  - Update import statement in tests/math.test.ts to include modulo function
-  - Add test cases for modulo function: basic operation (10 % 3 = 1), division by zero throws error, negative number handling
-  - Add test cases for enhanced divide function to verify non-finite results throw errors while preserving existing functionality
-  - Run npm test to verify all tests pass
+  - Read src/math.ts to understand existing code structure and the current divide function implementation
+  - Read tests/math.test.ts to understand existing test patterns and structure
+  - Add modulo(a, b) function to src/math.ts that returns a % b with division-by-zero guard (throw error when b === 0)
+  - Modify existing divide function in src/math.ts to add Number.isFinite() check on result and handle non-finite results appropriately
+  - Add comprehensive tests for modulo function in tests/math.test.ts covering normal cases, zero divisor, and edge cases
+  - Add tests for enhanced divide function to verify Number.isFinite() check works correctly
+  - Run npm test to ensure all tests pass
+  - Fix any test failures by adjusting implementation or tests as needed
 - **Acceptance**:
-  - modulo(10, 3) returns 1
-  - modulo(a, 0) throws division by zero error
-  - divide function still works for normal cases but throws error for non-finite results
-  - All existing tests continue to pass
-  - New test cases cover edge cases for both functions
-- **Risks**: Need to ensure Number.isFinite() check doesn't break existing divide function behavior, Modulo function should handle edge cases like negative numbers consistently, Test coverage must be comprehensive for both positive and negative scenarios
+  - modulo(a, b) function exists in src/math.ts and returns a % b
+  - modulo function throws appropriate error when b === 0 (division by zero)
+  - divide function includes Number.isFinite() check on result
+  - divide function handles non-finite results appropriately
+  - Comprehensive tests exist for modulo function covering normal operation and edge cases
+- **Risks**: Need to understand existing error handling patterns in the codebase to maintain consistency, Must ensure division-by-zero handling is consistent between divide and modulo functions, Need to verify what constitutes appropriate handling of non-finite results in divide function
 
 ### task-2
 - **Status**: approved | **Approved**: True
-- **Review reason**: Well-structured plan with clear steps, specific acceptance criteria, and appropriate risk assessment. Implements Euclidean modulo and enhances divide function with NaN checking.
+- **Review reason**: Complete plan with clear steps, proper error handling consistency, and comprehensive acceptance criteria. Low conflict risk as it adds new functionality without modifying existing behavior significantly.
 - **Steps**:
-  - Add remainder(a, b) function to src/math.ts that implements Euclidean modulo: ((a % b) + b) % b
-  - Add division-by-zero guard to remainder function (throw error if b === 0)
-  - Modify existing divide function to add isNaN() check on result and throw appropriate error
-  - Update tests/math.test.ts to import the new remainder function
-  - Add test cases for remainder function: normal cases, negative numbers, and division by zero
-  - Add test case for divide function NaN result handling
-  - Run npm test to verify all tests pass
+  - Read src/math.ts to understand current structure and existing divide function
+  - Read tests/math.test.ts to understand current test patterns
+  - Add remainder(a, b) function with Euclidean modulo logic: ((a % b) + b) % b
+  - Add division-by-zero guard to remainder function consistent with existing divide function
+  - Modify existing divide function to add isNaN() check on result and throw error if NaN
+  - Add comprehensive tests for remainder function covering positive/negative cases and division-by-zero
+  - Add tests for enhanced divide function with isNaN() check
+  - Update import statement in tests to include remainder function
+  - ... (2 more)
 - **Acceptance**:
-  - remainder function correctly implements Euclidean modulo formula
-  - remainder function throws error when divisor is zero
-  - divide function throws error when result is NaN
-  - All existing tests continue to pass
-  - New tests cover remainder function edge cases
-- **Risks**: Need to ensure Euclidean modulo handles negative numbers correctly, Must identify scenarios where divide function would return NaN, Existing divide function behavior should remain unchanged for valid inputs
+  - remainder(a, b) function returns ((a % b) + b) % b for Euclidean modulo
+  - remainder function throws 'Division by zero' error when b === 0
+  - remainder(-7, 3) returns 2 (proper Euclidean modulo behavior)
+  - divide function includes isNaN() check on result and throws error if NaN
+  - All new functionality has comprehensive test coverage
+- **Risks**: Need to ensure Euclidean modulo handles negative numbers correctly (always non-negative result), Division-by-zero handling must be consistent between remainder and divide functions, isNaN() check in divide function may need appropriate error message
 
 ### task-3
 - **Status**: approved | **Approved**: True
-- **Review reason**: Manually approved for forced-test-fail demo - plan will be refined during implementation
+- **Review reason**: 
 - **Steps**:
   - Read src/greet.ts to understand current greet() implementation
-  - Read tests/greet.test.ts to understand existing test structure and patterns
-  - Update greet() function in src/greet.ts to return 'Hi, {name}! Welcome!' instead of 'Hello, {name}!'
-  - Add new farewell(name) function in src/greet.ts that returns 'Goodbye, {name}!'
-  - Update tests/greet.test.ts to test the modified greet() function with new return format
-  - Add comprehensive tests for the new farewell() function in tests/greet.test.ts
+  - Read tests/greet.test.ts to understand existing test structure
+  - Update greet() in src/greet.ts to return 'Hi, {name}! Welcome!' instead of 'Hello, {name}!'
+  - Add farewell(name) function that returns 'Goodbye, {name}!'
+  - Update tests/greet.test.ts to match the new greet() format and add farewell() tests
   - Run npm test to verify all tests pass
-  - Fix any test failures by adjusting implementation or tests as needed
 - **Acceptance**:
-  - greet() function returns 'Hi, {name}! Welcome!' format
-  - farewell() function returns 'Goodbye, {name}!' format
-  - All existing functionality preserved
-  - Comprehensive test coverage for both functions
-  - All tests pass when running npm test
-- **Risks**: Existing tests may need updates to match new greet() return format, Need to ensure farewell() function follows same patterns as greet(), Test coverage should be comprehensive for both functions
+  - greet('World') returns 'Hi, World! Welcome!'
+  - farewell('World') returns 'Goodbye, World!'
+  - All vitest tests pass
+- **Risks**: Existing tests will fail until updated (intentional for demo), Stop hook will block Claude from stopping until tests pass
 
 ### task-4
 - **Status**: approved | **Approved**: True
-- **Review reason**: Well-defined plan for string utilities with comprehensive test coverage. No conflicts with other tasks and clear implementation path. Good early task to establish patterns.
+- **Review reason**: Well-structured plan that properly incorporates learning from LEARNINGS.md. Clear steps and acceptance criteria. Good risk assessment for edge cases.
 - **Steps**:
-  - Add truncate(str, maxLen) function to src/string-utils.ts that truncates strings to maximum length
-  - Add padLeft(str, len, char) function to src/string-utils.ts that pads strings on the left with specified character
-  - Update import statement in tests/string-utils.test.ts to include the new functions
-  - Add comprehensive test suite for truncate function covering normal operation, edge cases (empty strings, maxLen <= 0), and boundary conditions
-  - Add comprehensive test suite for padLeft function covering normal operation, edge cases (empty strings, len <= str.length), and default character behavior
-  - Run npm test to verify all existing and new tests pass
-  - Fix any test failures by adjusting function implementations
+  - Read LEARNINGS.md to understand relevant lessons and patterns
+  - Examine existing src/string-utils.ts to understand current structure and patterns
+  - Check tests/string-utils.test.ts to understand testing patterns
+  - Implement truncate(str, maxLen) function that shortens strings to maxLen characters
+  - Implement padLeft(str, len, char) function that pads strings on the left with specified character
+  - Add comprehensive tests for both functions covering edge cases
+  - Run npm test to ensure all tests pass
+  - Apply any relevant lessons from LEARNINGS.md during implementation
 - **Acceptance**:
-  - truncate function correctly truncates strings to specified maximum length
-  - padLeft function correctly pads strings on the left with specified or default character
-  - Both functions handle edge cases (empty strings, boundary conditions) properly
+  - truncate function correctly shortens strings to specified maximum length
+  - padLeft function correctly pads strings on the left with specified character
+  - Both functions handle edge cases (empty strings, zero/negative lengths, etc.)
   - All existing tests continue to pass
-  - New comprehensive test suites cover normal operation and edge cases
-- **Risks**: Edge case handling for null/undefined inputs may need careful consideration, padLeft function needs to handle default character parameter properly, Test coverage must match the existing comprehensive pattern in the codebase
+  - New tests provide comprehensive coverage for both functions
+- **Risks**: Need to understand existing code patterns before implementing, Edge cases in string manipulation (null/undefined inputs, negative lengths), Ensuring test coverage matches existing patterns in the codebase
 
 ### task-5
 - **Status**: approved | **Approved**: True
-- **Review reason**: Clean, straightforward plan for adding date utilities. No conflicts with other tasks, clear acceptance criteria, and realistic implementation steps. Good baseline task.
+- **Review reason**: Complete plan for creating new date utilities module. No conflicts with other tasks as it creates entirely new files. Clear acceptance criteria and realistic scope.
 - **Steps**:
-  - Create src/date-utils.ts with formatDate function that takes a Date and returns YYYY-MM-DD format using toISOString().split('T')[0]
-  - Add daysBetween function that calculates absolute difference in days between two dates using getTime() and Math.abs()
-  - Create tests/date-utils.test.ts following existing test patterns with vitest
-  - Add comprehensive test cases for formatDate: normal dates, edge cases like leap years, different months
-  - Add comprehensive test cases for daysBetween: same date (0 days), different order of dates, dates spanning months/years
-  - Run npm test to verify all tests pass
+  - Create src/date-utils.ts with two functions: formatDate(date: Date): string that returns YYYY-MM-DD format, and daysBetween(a: Date, b: Date): number that calculates the difference in days
+  - Implement formatDate using Date methods to extract year, month, and day, padding with zeros as needed
+  - Implement daysBetween by calculating the time difference in milliseconds and converting to days
+  - Create tests/date-utils.test.ts with comprehensive test cases for both functions
+  - Test formatDate with various dates including edge cases like single-digit months/days
+  - Test daysBetween with same dates (should return 0), different dates, and negative differences
+  - Run npm test to ensure all tests pass
 - **Acceptance**:
-  - formatDate function exists and returns YYYY-MM-DD format for any Date input
-  - daysBetween function exists and returns correct number of days between any two dates
-  - Both functions have comprehensive test coverage following existing patterns
-  - All tests pass when running npm test
-- **Risks**: Date timezone handling could cause issues if not using UTC consistently, Edge cases around daylight saving time transitions need proper handling
+  - formatDate function correctly formats dates as YYYY-MM-DD strings
+  - daysBetween function correctly calculates the number of days between two dates
+  - All test cases pass when running npm test
+  - Code follows TypeScript best practices with proper type annotations
+- **Risks**: Date timezone handling could cause inconsistent results across different environments, Edge cases around daylight saving time transitions might need special consideration, Leap year calculations should be handled correctly by native Date methods
 
 ## 2. Dispatch Flow per Task
 
 ### task-1
-- **Iterations**: 35
-- **Merge/rebase attempts**: 0
-- **Conflicts**: 0
-
-#### Dispatch 1: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 2: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 3: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 4: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 5: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 6: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 7: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 8: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 9: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 10: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 11: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 12: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 13: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0093
-- **Tools**: {'TodoWrite': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 14: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0093
-- **Tools**: {'TodoWrite': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 15: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 16: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 17: step3_implement
-- **Healthy**: True | **rc**: 1 | **turns**: 6 | **cost**: $0.0275
-- **Tools**: {'TodoWrite': 1, 'Read': 2}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 18: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 19: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 20: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 16 | **cost**: $0.0739
-- **Tools**: {'TodoWrite': 4, 'Read': 2, 'Edit': 4, 'Bash': 2}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: False
-- **Test output (excerpt)**: ```
-
-> test
-> vitest run
-
-
- RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-task-1
-
- ✓ tests/string-utils.test.ts (8 tests) 4ms
- ✓ tests/array-utils.test.ts (10 tests) 6ms
- ✓ tests/greet.test.ts (1 test) 2ms
- ❯ tests/math.test.ts (10 tests | 1 failed) 14ms
-   ✓ math > add 1ms
-   ✓ math > subtract 0ms
-   ✓ math > divide 0ms
-   ✓ math > divide by zero throws 1ms
-   ✓ math > multiply 0ms
-   ✓ math > power 0ms
-   ✓ math > modulo 0ms
-   ✓ math > modulo with negative numbers 0ms
-   ✓ math > modulo
-```
-
-#### Dispatch 21: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 22: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 7 | **cost**: $0.0276
-- **Tools**: {'TodoWrite': 2, 'Read': 2}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: False
-- **Test output (excerpt)**: ```
-
-> test
-> vitest run
-
-
- RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-task-1
-
- ✓ tests/greet.test.ts (1 test) 9ms
- ✓ tests/string-utils.test.ts (8 tests) 9ms
- ✓ tests/array-utils.test.ts (10 tests) 8ms
- ❯ tests/math.test.ts (10 tests | 1 failed) 23ms
-   ✓ math > add 2ms
-   ✓ math > subtract 0ms
-   ✓ math > divide 0ms
-   ✓ math > divide by zero throws 5ms
-   ✓ math > multiply 1ms
-   ✓ math > power 0ms
-   ✓ math > modulo 0ms
-   ✓ math > modulo with negative numbers 0ms
-   ✓ math > modulo
-```
-
-#### Dispatch 23: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 9 | **cost**: $0.0469
-- **Tools**: {'TodoWrite': 2, 'Read': 2, 'Bash': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: False
-- **Test output (excerpt)**: ```
-
-> test
-> vitest run
-
-
- RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-task-1
-
- ✓ tests/greet.test.ts (1 test) 4ms
- ✓ tests/array-utils.test.ts (10 tests) 7ms
- ✓ tests/string-utils.test.ts (8 tests) 6ms
- ❯ tests/math.test.ts (10 tests | 1 failed) 16ms
-   ✓ math > add 3ms
-   ✓ math > subtract 0ms
-   ✓ math > divide 0ms
-   ✓ math > divide by zero throws 1ms
-   ✓ math > multiply 0ms
-   ✓ math > power 0ms
-   ✓ math > modulo 0ms
-   ✓ math > modulo with negative numbers 0ms
-   ✓ math > modulo
-```
-
-#### Dispatch 24: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 8 | **cost**: $0.0275
-- **Tools**: {'TodoWrite': 2, 'Read': 2, 'Bash': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: False
-- **Test output (excerpt)**: ```
-
-> test
-> vitest run
-
-
- RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-task-1
-
- ✓ tests/string-utils.test.ts (8 tests) 8ms
- ✓ tests/array-utils.test.ts (10 tests) 14ms
- ❯ tests/math.test.ts (10 tests | 1 failed) 27ms
-   ✓ math > add 2ms
-   ✓ math > subtract 0ms
-   ✓ math > divide 0ms
-   ✓ math > divide by zero throws 2ms
-   ✓ math > multiply 1ms
-   ✓ math > power 0ms
-   ✓ math > modulo 1ms
-   ✓ math > modulo with negative numbers 0ms
-   ✓ math > modulo by zero throws 1ms
-   × math > div
-```
-
-#### Dispatch 25: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 9 | **cost**: $0.0379
-- **Tools**: {'TodoWrite': 2, 'Read': 2, 'Bash': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: False
-- **Test output (excerpt)**: ```
-
-> test
-> vitest run
-
-
- RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-task-1
-
- ✓ tests/greet.test.ts (1 test) 3ms
- ✓ tests/array-utils.test.ts (10 tests) 6ms
- ✓ tests/string-utils.test.ts (8 tests) 3ms
- ❯ tests/math.test.ts (10 tests | 1 failed) 12ms
-   ✓ math > add 2ms
-   ✓ math > subtract 0ms
-   ✓ math > divide 0ms
-   ✓ math > divide by zero throws 1ms
-   ✓ math > multiply 0ms
-   ✓ math > power 0ms
-   ✓ math > modulo 0ms
-   ✓ math > modulo with negative numbers 0ms
-   ✓ math > modulo
-```
-
-#### Dispatch 26: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0093
-- **Tools**: {'TodoWrite': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 27: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 28: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 29: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0093
-- **Tools**: {'TodoWrite': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 30: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 31: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 32: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0093
-- **Tools**: {'TodoWrite': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 33: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 34: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-#### Dispatch 35: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 9 | **cost**: $0.0278
-- **Tools**: {'TodoWrite': 1, 'Read': 1, 'Bash': 3}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-
-### task-2
-- **Iterations**: 2
-- **Merge/rebase attempts**: 1
-- **Conflicts**: 0
-
-#### Dispatch 1: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 17 | **cost**: $0.0563
-- **Tools**: {'TodoWrite': 6, 'Read': 2, 'Edit': 5, 'Bash': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: False
-- **Test output (excerpt)**: ```
-
-> test
-> vitest run
-
-
- RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-task-2
-
- ✓ tests/string-utils.test.ts (8 tests) 4ms
- ✓ tests/greet.test.ts (1 test) 3ms
- ✓ tests/array-utils.test.ts (10 tests) 6ms
- ❯ tests/math.test.ts (10 tests | 1 failed) 13ms
-   ✓ math > add 1ms
-   ✓ math > subtract 1ms
-   ✓ math > divide 0ms
-   ✓ math > divide by zero throws 1ms
-   ✓ math > divide NaN result throws 1ms
-   ✓ math > multiply 0ms
-   ✓ math > power 0ms
-   ✓ math > remainder 0ms
-   × math > remaind
-```
-
-#### Dispatch 2: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 13 | **cost**: $0.0640
-- **Tools**: {'TodoWrite': 3, 'Read': 2, 'Bash': 2, 'Edit': 1}
-- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
-The manager handles git operations ...`
-- **Tests passed**: True
-- **Commit**: `bec1ef31bd659c66eeed4c684531866576c7cb46` (ata/dev-tasks.json, src/math.ts, tests/math.test.ts)
-
-**Merge attempts**:
-- Attempt 1: passed=True
-
-**Rebase attempts**:
-- Attempt 1: passed=True, conflict=False
-
-### task-3
 - **Iterations**: 1
 - **Merge/rebase attempts**: 1
 - **Conflicts**: 0
 
 #### Dispatch 1: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 13 | **cost**: $0.0298
-- **Tools**: {'TodoWrite': 6, 'Read': 2, 'Edit': 2, 'Bash': 1}
+- **Healthy**: True | **rc**: 0 | **turns**: 21 | **cost**: $0.0664
+- **Tools**: {'TodoWrite': 8, 'Read': 2, 'Edit': 6, 'Bash': 2}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
 - **Tests passed**: True
-- **Commit**: `6984e337676caa1c0349d1a50a44a3daeceac957` (ata/dev-tasks.json, src/greet.ts, tests/greet.test.ts)
+- **Commit**: `4ba0b377cf5c932d2e8d02ece2d17edadd16a7d5` (ata/dev-tasks.json, src/math.ts, tests/math.test.ts)
 
 **Merge attempts**:
 - Attempt 1: passed=True
@@ -496,9 +120,9 @@ The manager handles git operations ...`
 **Rebase attempts**:
 - Attempt 1: passed=True, conflict=False
 
-### task-4
-- **Iterations**: 13
-- **Merge/rebase attempts**: 0
+### task-2
+- **Iterations**: 14
+- **Merge/rebase attempts**: 1
 - **Conflicts**: 0
 
 #### Dispatch 1: step3_implement
@@ -508,10 +132,32 @@ The manager handles git operations ...`
 The manager handles git operations ...`
 
 #### Dispatch 2: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
+- **Healthy**: True | **rc**: 0 | **turns**: 13 | **cost**: $0.0299
+- **Tools**: {'TodoWrite': 5, 'Read': 2, 'Edit': 3, 'Bash': 1}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-2
+
+ ✓ tests/greet.test.ts (1 test) 2ms
+ ✓ tests/string-utils.test.ts (8 tests) 3ms
+ ✓ tests/array-utils.test.ts (10 tests) 4ms
+ ❯ tests/math.test.ts (11 tests | 2 failed) 11ms
+   ✓ math > add 1ms
+   ✓ math > subtract 0ms
+   ✓ math > divide 0ms
+   ✓ math > divide by zero throws 1ms
+   ✓ math > multiply 0ms
+   ✓ math > power 0ms
+   ✓ math > remainder with positive numbers 0ms
+   ✓ math > remainder with negative dividen
+```
 
 #### Dispatch 3: step3_implement
 - **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
@@ -532,10 +178,32 @@ The manager handles git operations ...`
 The manager handles git operations ...`
 
 #### Dispatch 6: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
-- **Tools**: {}
+- **Healthy**: True | **rc**: 0 | **turns**: 5 | **cost**: $0.0181
+- **Tools**: {'TodoWrite': 2, 'Read': 1}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-2
+
+ ✓ tests/greet.test.ts (1 test) 3ms
+ ✓ tests/string-utils.test.ts (8 tests) 5ms
+ ✓ tests/array-utils.test.ts (10 tests) 6ms
+ ❯ tests/math.test.ts (11 tests | 2 failed) 16ms
+   ✓ math > add 2ms
+   ✓ math > subtract 0ms
+   ✓ math > divide 0ms
+   ✓ math > divide by zero throws 1ms
+   ✓ math > multiply 0ms
+   ✓ math > power 0ms
+   ✓ math > remainder with positive numbers 0ms
+   ✓ math > remainder with negative dividen
+```
 
 #### Dispatch 7: step3_implement
 - **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
@@ -544,8 +212,8 @@ The manager handles git operations ...`
 The manager handles git operations ...`
 
 #### Dispatch 8: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0083
-- **Tools**: {'TodoWrite': 1}
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
 
@@ -562,10 +230,32 @@ The manager handles git operations ...`
 The manager handles git operations ...`
 
 #### Dispatch 11: step3_implement
-- **Healthy**: False | **rc**: 0 | **turns**: 3 | **cost**: $0.0083
-- **Tools**: {'TodoWrite': 1}
+- **Healthy**: True | **rc**: 0 | **turns**: 5 | **cost**: $0.0181
+- **Tools**: {'TodoWrite': 2, 'Read': 1}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-2
+
+ ✓ tests/string-utils.test.ts (8 tests) 3ms
+ ✓ tests/array-utils.test.ts (10 tests) 4ms
+ ❯ tests/math.test.ts (11 tests | 2 failed) 12ms
+   ✓ math > add 1ms
+   ✓ math > subtract 0ms
+   ✓ math > divide 0ms
+   ✓ math > divide by zero throws 1ms
+   ✓ math > multiply 0ms
+   ✓ math > power 0ms
+   ✓ math > remainder with positive numbers 0ms
+   ✓ math > remainder with negative dividend 0ms
+   × math > remainder with neg
+```
 
 #### Dispatch 12: step3_implement
 - **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
@@ -574,14 +264,26 @@ The manager handles git operations ...`
 The manager handles git operations ...`
 
 #### Dispatch 13: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 19 | **cost**: $0.0455
-- **Tools**: {'TodoWrite': 8, 'Read': 2, 'Edit': 5, 'Bash': 1}
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 14: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 20 | **cost**: $0.0844
+- **Tools**: {'TodoWrite': 6, 'Read': 2, 'Bash': 2, 'Edit': 2}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
 - **Tests passed**: True
-- **Commit**: `90ef450c0deebdffc8b649b7e764934a7c953080` (ata/dev-tasks.json, src/string-utils.ts, tests/string-utils.test.ts)
+- **Commit**: `51efa0e881c9dfa48a924fee77dec05adde2eab5` (ata/dev-tasks.json, src/math.ts, tests/math.test.ts)
 
-### task-5
+**Merge attempts**:
+- Attempt 1: passed=True
+
+**Rebase attempts**:
+- Attempt 1: passed=True, conflict=False
+
+### task-3
 - **Iterations**: 4
 - **Merge/rebase attempts**: 1
 - **Conflicts**: 0
@@ -605,12 +307,235 @@ The manager handles git operations ...`
 The manager handles git operations ...`
 
 #### Dispatch 4: step3_implement
-- **Healthy**: True | **rc**: 0 | **turns**: 15 | **cost**: $0.0832
-- **Tools**: {'TodoWrite': 5, 'Glob': 2, 'Read': 2, 'Write': 2, 'Bash': 1}
+- **Healthy**: True | **rc**: 0 | **turns**: 13 | **cost**: $0.0253
+- **Tools**: {'TodoWrite': 6, 'Read': 2, 'Edit': 2, 'Bash': 1}
 - **Prompt preview**: `You are executing one coding task inside a managed git worktree.
 The manager handles git operations ...`
 - **Tests passed**: True
-- **Commit**: `f1be48811e76f0648ca980787d9fbd6691bd4329` (ata/dev-tasks.json, src/date-utils.ts, tests/date-utils.test.ts)
+- **Commit**: `c09ad2ef2abb1e21936e6eb737fbf9a4db1905a8` (ata/dev-tasks.json, src/greet.ts, tests/greet.test.ts)
+
+**Merge attempts**:
+- Attempt 1: passed=True
+
+**Rebase attempts**:
+- Attempt 1: passed=True, conflict=False
+
+### task-4
+- **Iterations**: 16
+- **Merge/rebase attempts**: 1
+- **Conflicts**: 0
+
+#### Dispatch 1: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 2: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 3: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 4: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 5: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 6: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 19 | **cost**: $0.0574
+- **Tools**: {'TodoWrite': 8, 'Read': 3, 'Edit': 4, 'Bash': 1}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-4
+
+ ✓ tests/math.test.ts (6 tests) 4ms
+ ✓ tests/array-utils.test.ts (10 tests) 5ms
+ ✓ tests/greet.test.ts (1 test) 2ms
+ ❯ tests/string-utils.test.ts (23 tests | 1 failed) 9ms
+   ✓ capitalize > capitalizes first letter and lowercases rest 1ms
+   ✓ capitalize > handles already capitalized string 0ms
+   ✓ capitalize > handles empty string 0ms
+   ✓ capitalize > handles single character 0ms
+   ✓ reverse > reverses a strin
+```
+
+#### Dispatch 7: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 14 | **cost**: $0.0699
+- **Tools**: {'TodoWrite': 5, 'Read': 3, 'Bash': 1}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-4
+
+ ✓ tests/greet.test.ts (1 test) 2ms
+ ✓ tests/math.test.ts (6 tests) 3ms
+ ✓ tests/array-utils.test.ts (10 tests) 4ms
+ ❯ tests/string-utils.test.ts (23 tests | 1 failed) 9ms
+   ✓ capitalize > capitalizes first letter and lowercases rest 1ms
+   ✓ capitalize > handles already capitalized string 0ms
+   ✓ capitalize > handles empty string 0ms
+   ✓ capitalize > handles single character 0ms
+   ✓ reverse > reverses a strin
+```
+
+#### Dispatch 8: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 7 | **cost**: $0.0163
+- **Tools**: {'TodoWrite': 3, 'Read': 2}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-4
+
+ ✓ tests/array-utils.test.ts (10 tests) 4ms
+ ✓ tests/greet.test.ts (1 test) 2ms
+ ✓ tests/math.test.ts (6 tests) 4ms
+ ❯ tests/string-utils.test.ts (23 tests | 1 failed) 10ms
+   ✓ capitalize > capitalizes first letter and lowercases rest 1ms
+   ✓ capitalize > handles already capitalized string 0ms
+   ✓ capitalize > handles empty string 0ms
+   ✓ capitalize > handles single character 0ms
+   ✓ reverse > reverses a stri
+```
+
+#### Dispatch 9: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 10: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 11: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 12: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 15 | **cost**: $0.0621
+- **Tools**: {'TodoWrite': 5, 'Read': 3, 'Bash': 1}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-4
+
+ ✓ tests/greet.test.ts (1 test) 3ms
+ ✓ tests/array-utils.test.ts (10 tests) 6ms
+ ❯ tests/string-utils.test.ts (23 tests | 1 failed) 14ms
+   ✓ capitalize > capitalizes first letter and lowercases rest 1ms
+   ✓ capitalize > handles already capitalized string 0ms
+   ✓ capitalize > handles empty string 0ms
+   ✓ capitalize > handles single character 0ms
+   ✓ reverse > reverses a string 0ms
+   ✓ reverse > handles empty 
+```
+
+#### Dispatch 13: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 14: step3_implement
+- **Healthy**: False | **rc**: 0 | **turns**: 1 | **cost**: $0.0000
+- **Tools**: {}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+
+#### Dispatch 15: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 7 | **cost**: $0.0163
+- **Tools**: {'TodoWrite': 3, 'Read': 2}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: False
+- **Test output (excerpt)**: ```
+
+> test
+> vitest run
+
+
+ RUN  v3.2.4 /home/indows/claude-learning-worktrees/task-4
+
+ ✓ tests/greet.test.ts (1 test) 3ms
+ ✓ tests/math.test.ts (6 tests) 4ms
+ ✓ tests/array-utils.test.ts (10 tests) 4ms
+ ❯ tests/string-utils.test.ts (23 tests | 1 failed) 10ms
+   ✓ capitalize > capitalizes first letter and lowercases rest 1ms
+   ✓ capitalize > handles already capitalized string 0ms
+   ✓ capitalize > handles empty string 0ms
+   ✓ capitalize > handles single character 0ms
+   ✓ reverse > reverses a stri
+```
+
+#### Dispatch 16: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 21 | **cost**: $0.0897
+- **Tools**: {'TodoWrite': 8, 'Read': 3, 'Bash': 2, 'Edit': 1}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: True
+- **Commit**: `cf51cd0c23ea6b1951ae3f2274daf701e748bc68` (ata/dev-tasks.json, src/string-utils.ts, tests/string-utils.test.ts)
+
+**Merge attempts**:
+- Attempt 1: passed=True
+
+**Rebase attempts**:
+- Attempt 1: passed=True, conflict=False
+
+### task-5
+- **Iterations**: 1
+- **Merge/rebase attempts**: 1
+- **Conflicts**: 0
+
+#### Dispatch 1: step3_implement
+- **Healthy**: True | **rc**: 0 | **turns**: 18 | **cost**: $0.0668
+- **Tools**: {'TodoWrite': 5, 'Read': 4, 'Bash': 4, 'Write': 2}
+- **Prompt preview**: `You are executing one coding task inside a managed git worktree.
+The manager handles git operations ...`
+- **Tests passed**: True
+- **Commit**: `cb69d3ee99e2593494a3690e53e9ffe30b2a8c5e` (ata/dev-tasks.json, src/date-utils.ts, tests/date-utils.test.ts)
 
 **Merge attempts**:
 - Attempt 1: passed=True
@@ -622,13 +547,21 @@ The manager handles git operations ...`
 
 | Task | Re-dispatch (unhealthy) | Re-dispatch (test fail) | Re-dispatch (empty commit) | Conflict resolution | Merge/test repair |
 |------|-------------------------|-------------------------|----------------------------|--------------------|-------------------|
-| task-1 | 28 | 5 | 0 | 0 | 0 |
-| task-2 | 0 | 1 | 0 | 0 | 0 |
-| task-3 | 0 | 0 | 0 | 0 | 0 |
-| task-4 | 12 | 0 | 0 | 0 | 0 |
-| task-5 | 3 | 0 | 0 | 0 | 0 |
+| task-1 | 0 | 0 | 0 | 0 | 0 |
+| task-2 | 10 | 3 | 0 | 0 | 0 |
+| task-3 | 3 | 0 | 0 | 0 | 0 |
+| task-4 | 10 | 5 | 0 | 0 | 0 |
+| task-5 | 0 | 0 | 0 | 0 | 0 |
 
 ## 4. Merge/Rebase Evidence
+
+### task-1
+- Attempt 1: passed=True, conflict=False
+  Output:
+  ```
+  Current branch task/task-1-conflict-alpha is up to date.
+
+  ```
 
 ### task-2
 - Attempt 1: passed=True, conflict=False
@@ -646,6 +579,14 @@ The manager handles git operations ...`
 
   ```
 
+### task-4
+- Attempt 1: passed=True, conflict=False
+  Output:
+  ```
+  Current branch task/task-4-learning-consumer is up to date.
+
+  ```
+
 ### task-5
 - Attempt 1: passed=True, conflict=False
   Output:
@@ -659,30 +600,53 @@ The manager handles git operations ...`
 ### LEARNINGS.md (excerpt)
 ```
 # LEARNINGS.md
-
-## task-2: conflict-beta (2026-02-19)
-- commit: bec1ef31bd659c66eeed4c684531866576c7cb46
-- cost: $0.1203, 2 iteration(s), 30 turns
-- tools: Bash(3), Edit(6), Read(4), TodoWrite(9)
-- conflict: none
-- lesson: clean run
-## task-3: forced-test-fail (2026-02-19)
-- commit: 6984e337676caa1c0349d1a50a44a3daeceac957
-- cost: $0.0298, 1 iteration(s), 13 turns
+## task-3: forced-test-fail (2026-02-20)
+- commit: n/a
+- cost: $0.0446, 1 dispatch(es), 14 turns
 - tools: Bash(1), Edit(2), Read(2), TodoWrite(6)
 - conflict: none
+- unhealthy_dispatches: 0
+- test_fail_dispatches: 0
 - lesson: clean run
-## task-1: conflict-alpha (2026-02-19)
-- commit: n/a
-- cost: $0.3156, 35 iteration(s), 102 turns
-- tools: Bash(8), Edit(4), Read(13), TodoWrite(19)
+## task-2: conflict-beta (2026-02-20)
+- commit: 51efa0e881c9dfa48a924fee77dec05adde2eab5
+- cost: $0.1505, 14 dispatch(es), 53 turns
+- tools: Bash(3), Edit(5), Read(6), TodoWrite(15)
 - conflict: none
-- lesson: runtime/tool errors detected
-## task-5: clean-baseline (2026-02-19)
-- commit: f1be48811e76f0648ca980787d9fbd6691bd4329
-- cost: $0.0832, 4 iteration(s), 18 turns
-- tools: Bash(1), Glob(2), Read(2), TodoWrite(5), Write(2)
+- unhealthy_dispatches: 10
+- test_fail_dispatches: 3
+- lesson: 10/14 dispatches unhealthy (no tools); 3 dispatch(es) had test failures
+## task-3: forced-test-fail (2026-02-20)
+- commit: c09ad2ef2abb1e21936e6eb737fbf9a4db1905a8
+- cost: $0.0253, 4 dispatch(es), 30 turns
+- tools: Bash(2), Edit(4), Read(4), TodoWrite(12)
 - conflict: none
+- unhealthy_dispatches: 3
+- test_fail_dispatches: 0
+- lesson: 3/4 dispatches unhealthy (no file-modifying tools used)
+## task-4: learning-consumer (2026-02-20)
+- commit: cf51cd0c23ea6b1951ae3f2274daf701e748bc68
+- cost: $0.3116, 16 dispatch(es), 93 turns
+- tools: Bash(5), Edit(5), Read(16), TodoWrite(32)
+- conflict: none
+- unhealthy_dispatches: 10
+- test_fail_dispatches: 5
+- lesson: 10/16 dispatches unhealthy (no tools); 5 dispatch(es) had test failures
+## task-5: clean-baseline (2026-02-20)
+- commit: cb69d3ee99e2593494a3690e53e9ffe30b2a8c5e
+- cost: $0.0668, 1 dispatch(es), 18 turns
+- tools: Bash(4), Read(4), TodoWrite(5), Write(2)
+- conflict: none
+- unhealthy_dispatches: 0
+- test_fail_dispatches: 0
+- lesson: clean run
+## task-1: conflict-alpha (2026-02-20)
+- commit: 4ba0b377cf5c932d2e8d02ece2d17edadd16a7d5
+- cost: $0.0664, 1 dispatch(es), 21 turns
+- tools: Bash(2), Edit(6), Read(2), TodoWrite(8)
+- conflict: none
+- unhealthy_dispatches: 0
+- test_fail_dispatches: 0
 - lesson: clean run
 
 ```
@@ -691,8 +655,8 @@ The manager handles git operations ...`
 
 | Task | Step 1 | Step 2 | Step 3 done | Step 4 | Step 5 | Step 6 | Step 7 | Step 8 | Step 9 | Cost |
 |------|--------|--------|-------------|--------|--------|--------|--------|--------|--------|------|
-| task-1 | 2026-02-19T14:49:32 | 2026-02-19T14:49:34 | - | - | - | - | - | 2026-02-19T15:03:15 | 2026-02-19T15:03:15 | $0.32 |
-| task-2 | 2026-02-19T14:49:32 | 2026-02-19T14:49:34 | 2026-02-19T14:54:29 | 2026-02-19T14:54:29 | 2026-02-19T14:54:32 | 2026-02-19T14:54:40 | 2026-02-19T14:54:40 | 2026-02-19T14:54:40 | 2026-02-19T14:54:40 | $0.12 |
-| task-3 | 2026-02-19T14:54:40 | 2026-02-19T14:54:42 | 2026-02-19T14:57:35 | 2026-02-19T14:57:35 | 2026-02-19T14:57:37 | 2026-02-19T14:57:44 | 2026-02-19T14:57:44 | 2026-02-19T14:57:44 | 2026-02-19T14:57:44 | $0.03 |
-| task-4 | 2026-02-19T15:02:36 | 2026-02-19T15:02:39 | 2026-02-19T15:08:51 | 2026-02-19T15:08:51 | - | - | - | - | - | $0.06 |
-| task-5 | 2026-02-19T15:03:15 | 2026-02-19T15:03:18 | 2026-02-19T15:05:59 | 2026-02-19T15:05:59 | 2026-02-19T15:06:03 | 2026-02-19T15:06:13 | 2026-02-19T15:06:13 | 2026-02-19T15:06:13 | 2026-02-19T15:06:13 | $0.08 |
+| task-1 | 2026-02-20T03:01:25 | 2026-02-20T03:01:27 | 2026-02-20T03:06:05 | 2026-02-20T03:06:05 | 2026-02-20T03:06:07 | 2026-02-20T03:06:14 | 2026-02-20T03:06:14 | 2026-02-20T03:06:14 | 2026-02-20T03:06:14 | $0.07 |
+| task-2 | 2026-02-20T02:18:32 | 2026-02-20T02:18:34 | 2026-02-20T02:33:00 | 2026-02-20T02:33:00 | 2026-02-20T02:33:02 | 2026-02-20T02:33:09 | 2026-02-20T02:33:09 | 2026-02-20T02:33:09 | 2026-02-20T02:33:09 | $0.15 |
+| task-3 | 2026-02-20T02:33:09 | 2026-02-20T02:33:10 | 2026-02-20T02:35:51 | 2026-02-20T02:35:51 | 2026-02-20T02:35:53 | 2026-02-20T02:35:59 | 2026-02-20T02:35:59 | 2026-02-20T02:35:59 | 2026-02-20T02:35:59 | $0.03 |
+| task-4 | 2026-02-20T02:21:10 | 2026-02-20T02:21:11 | 2026-02-20T02:37:07 | 2026-02-20T02:37:07 | 2026-02-20T02:37:09 | 2026-02-20T02:37:16 | 2026-02-20T02:37:16 | 2026-02-20T02:37:16 | 2026-02-20T02:37:16 | $0.31 |
+| task-5 | 2026-02-20T02:35:59 | 2026-02-20T02:36:01 | 2026-02-20T02:38:35 | 2026-02-20T02:38:35 | 2026-02-20T02:38:37 | 2026-02-20T02:38:43 | 2026-02-20T02:38:43 | 2026-02-20T02:38:43 | 2026-02-20T02:38:43 | $0.07 |

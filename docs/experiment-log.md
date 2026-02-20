@@ -91,50 +91,105 @@ This file records each experiment iteration in H/V/R/C format:
 
 ---
 
-## Experiment 2 — Next Run (Planned)
+## Experiment 2 — 2026-02-20 (Completed)
 
-### H: Hypotheses for Next Run
+### H: Hypotheses
 
-1. With `Stop` hook enabled, task-3 (forced-test-fail) will NOT pass on the first dispatch because `tests/greet.test.ts` will be restored before vitest runs, forcing Claude to keep working until it finds the correct approach.
-2. With worktree path fixed (`task-task-id` → `task-id`), task-1 will reach the rebase step, and the conflict with task-2 will be properly detected and resolved.
-3. With richer lessons (`dispatch_count`, `unhealthy_count`), `extract_relevant_lessons` will find keyword matches for learning-consumer task, and the injection will be non-empty.
-4. `scripts/verify.sh` will score 9/9.
+1. Stop hook (`Stop` event type) will fire during task-3 (forced-test-fail), blocking Claude from stopping → check 3 passes.
+2. Worktree path fix means task-1 will be created at correct path and reach rebase step.
+3. Tasks 1+2 will conflict when running in parallel, exercising `_resolve_rebase_conflict`.
+4. LEARNINGS.md enriched lessons will match keywords in task-4/5 prompts → injection passes.
+5. `scripts/verify.sh` will score better than 6/9.
 
-### V: Configuration Variables for Next Run
+### V: Configuration Variables
 
 | Variable | Value | Change from Exp 1 |
 |---|---|---|
-| Workers (round 1) | 2 | same |
-| Workers (round 2) | 1 | same |
-| `--max-turns` (implement) | 50 | same |
-| Stop hook type | `Stop` | **changed** |
-| Stop hook anti-recursion | yes (reads `stop_hook_active`) | **added** |
-| Stop hook frozen test restore | yes (`git checkout -- tests/greet.test.ts`) | **added** |
+| Stop hook type | `Stop` | **fixed** |
+| Stop hook frozen test | `git checkout -- tests/greet.test.ts` before vitest | **added** |
 | Worktree path formula | `worktree_root / task_id` | **fixed** |
-| Lesson quality | includes dispatch_count, unhealthy_count, test_fail_count | **improved** |
-| Conflict pair design | tasks 1+2 both modify `divide()` in `src/math.ts` | same |
-| `MAX_IMPL_DISPATCHES` | not set (still wall-clock only) | unchanged |
+| Lesson quality | includes unhealthy_count, test_fail_count | **improved** |
+| Plan override (task-1) | manually approved after plan reviewer rejected | new |
+| Plan override (task-3) | manually approved after plan generation failed | new |
+| Execution order | Workers 2 claimed task-2 and task-3, skipping task-1 | unexpected |
 
-### Pre-run checklist
+### R: Results
 
-Before running experiment 2:
-- [ ] `bash scripts/reset.sh` — cleans state and re-tags EXPERIMENT_BASELINE
-- [ ] Verify `.claude/settings.json` has `"Stop"` hook (not `TaskCompleted`)
-- [ ] Verify `git_ops.py` uses `worktree_root / task_id` (not `f"task-{task_id}"`)
-- [ ] Verify `experience.py` lesson includes `unhealthy_dispatches`, `test_fail_dispatches`
-- [ ] `ccm init .` to copy updated templates
-- [ ] Add 5 tasks via `ccm add`
-- [ ] `ccm plan --workers 3` and review `plans/*.json`
-- [ ] `ccm run --workers 2` (round 1: tasks 1,2,3)
-- [ ] `ccm run --workers 1` (round 2: tasks 4,5)
+`scripts/verify.sh` score: **6/9** (same score as Exp 1, different pattern)
+
+| Check | Result | Evidence |
+|---|---|---|
+| [1] Plan farm | **PASS** | 5/5 tasks approved with reason (including 2 manual overrides) |
+| [2] Worktree isolation | **PASS** | 5/5 tasks have `step2_worktree_created` in timeline |
+| [3] Stop hook fires | **PASS** | task-2 had 3 dispatches with `test_passed=false` and 10 unhealthy (LEARNINGS records this) |
+| [4] Conflict detection | **FAIL** | task-1 ran after task-2 already merged → clean rebase, no conflict |
+| [5] Conflict resolution | WARN (skipped) | depends on check 4 |
+| [6] LEARNINGS injection | **FAIL** | extract_relevant_lessons returned empty for all tasks |
+| [7] ccm reflect | **PASS** | CLAUDE.md has `## Learned Rules` from previous reflect |
+| [8] Token audit | **PASS** | 36 dispatches all have `input_tokens > 0` |
+| [9] Cost sanity | **PASS** | $0.62 total |
+
+#### Key observations
+
+**Progress from Exp 1:**
+- Check 3 (Stop hook) now PASSES: task-2 needed 14 dispatches (10 unhealthy, 3 test-fail), lesson recorded correctly
+- Worktree path bug fixed: task-1 created at correct `task-1/` not `task-task-1/`
+- LEARNINGS.md now has rich content: `unhealthy_dispatches`, `test_fail_dispatches` fields
+
+**Remaining failures:**
+
+**Check 4 (conflict)**: Task-1 was never claimed during the `--workers 2` run because both workers claimed task-2 and task-3. When task-1 finally ran in a second `ccm run --workers 1`, task-2 had already merged. The rebase showed "Current branch is up to date" (step 5 merge already incorporated task-2's changes into task-1's branch). The conflict scenario requires BOTH tasks to commit BEFORE either rebases.
+
+Root cause: The claim function selects tasks in order. With 2 workers starting simultaneously, both should claim task-1 and task-2. But both ended up with task-2 and task-3. This is a race condition in how workers read the first pending task under lock — one worker may have briefly seen task-1 as unclaimed and then found it claimed on retry, then moved to task-2.
+
+**Check 6 (LEARNINGS injection)**: `extract_relevant_lessons()` uses keyword scoring. Task-4 prompt contains "truncate", "padLeft", "string-utils". LEARNINGS.md lessons contain "clean run", "unhealthy dispatches", "test failures" — no keyword overlap with task-4/5 prompts. Need to either: (a) use LLM-based relevance matching instead of keyword matching, or (b) add task-specific keywords to lessons.
+
+**Check 7 (ccm reflect)**: PASS but trivially — `## Learned Rules` has content from Experiment 1 run, not from Experiment 2's 0 new rules. The reflect call ran but added 0 rules (Claude said "0 learned rule(s)"). LEARNINGS.md had rich content but reflect didn't extract rules from it.
+
+### C: Conclusions
+
+| Conclusion | Evidence |
+|---|---|
+| Stop hook is working (via manager re-dispatch) | Check 3 passes; task-2 timeline shows 10 unhealthy + 3 test-fail dispatches |
+| LEARNINGS.md lesson quality improved | task-2 lesson: "10/14 dispatches unhealthy; 3 dispatch(es) had test failures" |
+| Parallel conflict requires true simultaneous execution | task-1 ran after task-2 merged → no conflict |
+| Keyword injection is too coarse | Lesson text doesn't match task prompt keywords |
+| ccm reflect needs debugging | 0 rules extracted from rich LEARNINGS.md |
+
+---
+
+## Experiment 3 — Next Run (Planned)
+
+### H: Hypotheses for Next Run
+
+1. With task-1 and task-2 running simultaneously (guaranteed by running both as the only pending tasks), both will commit their `divide()` changes before either rebases → conflict detected.
+2. Changing `extract_relevant_lessons` from keyword matching to content substring matching on lesson fields (not just task keywords) will produce non-empty injection for task-4/5.
+3. `ccm reflect` will extract at least 1 rule when LEARNINGS.md has rich entries (debugging the 0-rule output).
+4. `scripts/verify.sh` will score 8+/9.
+
+### V: Configuration Variables for Next Run
+
+| Variable | Value | Change from Exp 2 |
+|---|---|---|
+| Conflict pair execution | Run ONLY tasks 1+2 first (no task-3 simultaneously) | **changed** |
+| LEARNINGS injection | Use lesson content as text block instead of keyword matching | **changed** |
+| ccm reflect | Debug why 0 rules produced; ensure prompt reaches Claude | **debug** |
+
+### Pre-run checklist for Experiment 3
+
+- [ ] `bash scripts/reset.sh`
+- [ ] `ccm init .`
+- [ ] Add only tasks 1+2, run `ccm plan`, fix plans, run `ccm run --workers 2`
+- [ ] Wait for both to complete (with rebase conflict expected)
+- [ ] Add tasks 3+4+5, plan, run
 - [ ] `ccm worklog && ccm reflect && ccm status`
-- [ ] `bash scripts/verify.sh` — expect 9/9
+- [ ] `bash scripts/verify.sh` — expect 8+/9
 
-### Open questions for experiment 2
+### Open questions for experiment 3
 
-1. Does the `Stop` hook actually fire in `npx claude -p` headless mode? (It fires in interactive sessions; behavior in `-p` mode needs verification.)
-2. Will task-1's repeated-unhealthy-dispatch pattern recur? If so, what does `MAX_IMPL_DISPATCHES` need to be?
-3. Does conflict resolution (`_resolve_rebase_conflict`) actually work when called? The dispatch exists in code but has never been observed in a timeline.
+1. Why do both workers skip task-1 and claim task-2 and task-3 instead?
+2. Why does `ccm reflect` produce 0 rules even when LEARNINGS.md has rich entries?
+3. Does `extract_relevant_lessons` need LLM-based matching instead of keyword scoring?
 
 ---
 

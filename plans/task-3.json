@@ -1,0 +1,29 @@
+{
+  "task_id": "task-3",
+  "task_title": "forced-test-fail",
+  "generated_at": "2026-02-20T02:20:00+00:00",
+  "status": "approved",
+  "plan_reason": "Manually approved for demo: plan reviewer originally rejected due to incomplete plan generation. Task is intentionally designed to exercise the Stop hook quality gate and test-failure retry loop.",
+  "approved": true,
+  "plan": {
+    "title": "Change greet() format and add farewell() function",
+    "steps": [
+      "Read src/greet.ts to understand current greet() implementation",
+      "Read tests/greet.test.ts to understand existing test structure",
+      "Update greet() in src/greet.ts to return 'Hi, {name}! Welcome!' instead of 'Hello, {name}!'",
+      "Add farewell(name) function that returns 'Goodbye, {name}!'",
+      "Update tests/greet.test.ts to match the new greet() format and add farewell() tests",
+      "Run npm test to verify all tests pass"
+    ],
+    "acceptance": [
+      "greet('World') returns 'Hi, World! Welcome!'",
+      "farewell('World') returns 'Goodbye, World!'",
+      "All vitest tests pass"
+    ],
+    "risks": [
+      "Existing tests will fail until updated (intentional for demo)",
+      "Stop hook will block Claude from stopping until tests pass"
+    ],
+    "files_to_modify": ["src/greet.ts", "tests/greet.test.ts"]
+  }
+}
